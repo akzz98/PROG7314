@@ -56,6 +56,19 @@ android/          Jetpack Compose app (application id com.munipulse)
 api/              MuniPulse.slnx and MuniPulse.Api
 ```
 
+## Version control and GitHub Actions
+
+This is one Git repository. `android/` is the Compose app and `api/` is the ASP.NET Core solution. Commit source, the Gradle wrapper, `google-services.json.example`, and `appsettings.json` with the secret fields left empty. The root `.gitignore` keeps local files out of history: `google-services.json`, `local.properties`, `appsettings.Development.json`, `App_Data/`, build output, and `CHECKLIST.md`.
+
+Every push runs two workflows. Each job checks out the repository with read-only permission and defines no secrets.
+
+| Workflow | File | What a push runs |
+| --- | --- | --- |
+| API | `.github/workflows/api.yml` | .NET 10 SDK, then `dotnet test api/MuniPulse.slnx` |
+| Android | `.github/workflows/android.yml` | JDK 21, Android compile SDK 37, then `:app:testDebugUnitTest` |
+
+The API job uses the empty MongoDB connection string and the empty JWT signing key in `appsettings.json`. The Android job copies `google-services.json.example` into the gitignored Firebase file and does not call Firebase. GitHub-hosted runners do not include the Android SDK, so that job installs platform 37. It does not start an emulator. If platform 37 is missing from the SDK manager, the Android job cannot compile.
+
 ## Run the API
 
 Requires the .NET 10 SDK.
@@ -64,9 +77,7 @@ Requires the .NET 10 SDK.
 dotnet run --project api/MuniPulse.Api --launch-profile http
 ```
 
-`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, the 250 metre duplicate window, the field-worker demo key comparison, and unauthenticated calls. They do not need Firebase, MongoDB, or a JWT signing key. `.github/workflows/api.yml` runs the same command on every push.
-
-Both GitHub Actions jobs go green from the committed files alone. The API job uses the empty MongoDB connection string and the empty JWT signing key in `appsettings.json`. The Android job copies `google-services.json.example` and does not call Firebase. Neither workflow defines a secret.
+`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, the 250 metre duplicate window, the field-worker demo key comparison, and unauthenticated calls. They do not need Firebase, MongoDB, or a JWT signing key. The API workflow runs the same command on every push.
 
 Health check: [http://localhost:5285/health](http://localhost:5285/health)
 
@@ -124,7 +135,7 @@ Open `android/` in Android Studio (AGP 9.4, Gradle 9.6, compile SDK 37). Studio 
 
 The default API address `http://10.0.2.2:5285/` is the emulator route to the API on your computer. A physical phone needs your PC's LAN address or an HTTPS tunnel.
 
-From `android/`, `.\gradlew.bat :app:testDebugUnitTest` runs the incident form validator tests. Those tests do not need Firebase, MongoDB, or a device. `.github/workflows/android.yml` runs the same task on every push. GitHub-hosted runners do not include the Android SDK, so the job installs JDK 21 and compile SDK 37, then copies `google-services.json.example` over the gitignored Firebase file. It does not start an emulator. If platform 37 is missing from the SDK manager, the job cannot compile.
+From `android/`, `.\gradlew.bat :app:testDebugUnitTest` runs the incident form validator tests. Those tests do not need Firebase, MongoDB, or a device. The Android workflow runs the same task on every push.
 
 ### Google sign-in
 
