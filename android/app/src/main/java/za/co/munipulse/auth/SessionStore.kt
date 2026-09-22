@@ -16,7 +16,7 @@ class SessionStore(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
 
-    fun save(session: SessionResponse, displayName: String, email: String) {
+    fun save(session: SessionResponse, displayName: String, email: String, defaultWardCode: String) {
         val expiresAt = System.currentTimeMillis() + session.expiresIn * 1000L
         preferences.edit()
             .putString(KEY_TOKEN, session.accessToken)
@@ -24,8 +24,17 @@ class SessionStore(context: Context) {
             .putString(KEY_USER_ID, session.user.id)
             .putString(KEY_DISPLAY_NAME, displayName)
             .putString(KEY_EMAIL, email)
+            .putString(KEY_WARD, WardCatalog.normalize(defaultWardCode))
             .apply()
         Log.i(TAG, "Stored API session for user ${session.user.id}")
+    }
+
+    fun updateWard(code: String): Boolean {
+        if (!WardCatalog.isKnown(code)) {
+            return false
+        }
+        preferences.edit().putString(KEY_WARD, code).apply()
+        return true
     }
 
     fun read(): StoredSession? {
@@ -41,6 +50,7 @@ class SessionStore(context: Context) {
             userId = userId,
             displayName = preferences.getString(KEY_DISPLAY_NAME, null).orEmpty(),
             email = preferences.getString(KEY_EMAIL, null).orEmpty(),
+            defaultWardCode = WardCatalog.normalize(preferences.getString(KEY_WARD, null)),
         )
     }
 
@@ -60,6 +70,7 @@ class SessionStore(context: Context) {
         const val KEY_USER_ID = "user_id"
         const val KEY_DISPLAY_NAME = "display_name"
         const val KEY_EMAIL = "email"
+        const val KEY_WARD = "default_ward"
     }
 }
 
@@ -69,6 +80,7 @@ data class StoredSession(
     val userId: String,
     val displayName: String,
     val email: String,
+    val defaultWardCode: String,
 ) {
     fun isExpired(nowEpochMs: Long = System.currentTimeMillis()): Boolean =
         nowEpochMs >= expiresAtEpochMs - EXPIRY_SKEW_MS

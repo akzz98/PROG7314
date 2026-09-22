@@ -15,11 +15,13 @@ import za.co.munipulse.auth.SignInUiState
 import za.co.munipulse.ui.home.HomeScreen
 import za.co.munipulse.ui.login.LoginScreen
 import za.co.munipulse.ui.onboarding.OnboardingScreen
+import za.co.munipulse.ui.settings.SettingsScreen
 import za.co.munipulse.ui.splash.SplashScreen
 
 @Composable
 fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     var splashHold by remember { mutableStateOf(true) }
+    var showSettings by remember { mutableStateOf(false) }
     val state by viewModel.state.collectAsState()
     val restoring by viewModel.restoring.collectAsState()
     val onboardingDone by viewModel.onboardingComplete.collectAsState()
@@ -45,11 +47,22 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     val current = state
     when {
         showSplash -> SplashScreen()
+        current is SignInUiState.SignedIn && showSettings -> SettingsScreen(
+            displayName = current.displayName,
+            email = current.email,
+            defaultWardCode = current.defaultWardCode,
+            onWardSelected = viewModel::updateDefaultWard,
+            onSignOut = {
+                showSettings = false
+                viewModel.signOut()
+            },
+            onBack = { showSettings = false },
+        )
         current is SignInUiState.SignedIn -> HomeScreen(
             displayName = current.displayName,
             email = current.email,
             sessionNote = current.sessionNote,
-            onSignOut = viewModel::signOut,
+            onOpenSettings = { showSettings = true },
         )
         !onboardingDone -> OnboardingScreen(onContinue = viewModel::finishOnboarding)
         else -> LoginScreen(

@@ -22,7 +22,7 @@ fun HomeScreen(
     displayName: String,
     email: String,
     sessionNote: String,
-    onSignOut: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -41,8 +41,8 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = sessionNote, style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
-            Text(text = stringResource(R.string.sign_out))
+        Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(R.string.home_settings))
         }
     }
 }

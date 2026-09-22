@@ -19,7 +19,12 @@ sealed interface SignInUiState {
     data object Ready : SignInUiState
     data object Working : SignInUiState
     data class Failed(val message: String) : SignInUiState
-    data class SignedIn(val displayName: String, val email: String, val sessionNote: String) : SignInUiState
+    data class SignedIn(
+        val displayName: String,
+        val email: String,
+        val sessionNote: String,
+        val defaultWardCode: String,
+    ) : SignInUiState
     data object MissingConfig : SignInUiState
     data object MissingWebClient : SignInUiState
 }
@@ -79,6 +84,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 stored.displayName.ifBlank { user.displayName },
                 stored.email.ifBlank { user.email },
                 context.getString(R.string.session_ready),
+                stored.defaultWardCode,
             )
             return
         }
@@ -110,6 +116,16 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    fun updateDefaultWard(code: String) {
+        val current = _state.value as? SignInUiState.SignedIn ?: return
+        if (!sessionStore.updateWard(code)) {
+            Log.w(TAG, "Ignored unknown ward selection")
+            return
+        }
+        _state.value = current.copy(defaultWardCode = code)
+        Log.i(TAG, "Default ward set to $code")
+    }
+
     fun signOut() {
         accessToken = null
         sessionStore.clear()
@@ -127,6 +143,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     }
 
     private suspend fun sessionState(user: FirebaseUser): SignInUiState {
+        var ward = WardCatalog.DEFAULT
         val note = try {
             val idToken = user.getIdToken(false).await().token
                 ?: throw SessionExchangeException("Firebase did not return an ID token.")
@@ -134,25 +151,38 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             accessToken = session.accessToken
             val name = user.displayName?.takeIf { it.isNotBlank() } ?: "Google account"
             val email = user.email.orEmpty()
-            sessionStore.save(session, name, email)
+            ward = WardCatalog.normalize(session.user.defaultWardCode)
+            sessionStore.save(session, name, email, ward)
             Log.i(TAG, "API session issued for user ${session.user.id}")
             getApplication<Application>().getString(R.string.session_ready)
         } catch (error: Exception) {
             accessToken = null
             sessionStore.clear()
+            ward = WardCatalog.DEFAULT
             Log.e(TAG, "API session exchange failed: ${error.javaClass.simpleName}")
             if (error is SessionExchangeException) error.message else {
                 getApplication<Application>().getString(R.string.session_failed)
             }
         }
-        return signedIn(user.displayName, user.email, note ?: getApplication<Application>().getString(R.string.session_failed))
+        return signedIn(
+            user.displayName,
+            user.email,
+            note ?: getApplication<Application>().getString(R.string.session_failed),
+            ward,
+        )
     }
 
-    private fun signedIn(displayName: String?, email: String?, sessionNote: String): SignInUiState.SignedIn =
+    private fun signedIn(
+        displayName: String?,
+        email: String?,
+        sessionNote: String,
+        defaultWardCode: String,
+    ): SignInUiState.SignedIn =
         SignInUiState.SignedIn(
             displayName = displayName?.takeIf { it.isNotBlank() } ?: "Google account",
             email = email?.takeIf { it.isNotBlank() } ?: "",
             sessionNote = sessionNote,
+            defaultWardCode = WardCatalog.normalize(defaultWardCode),
         )
 
     private companion object {

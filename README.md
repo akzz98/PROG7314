@@ -79,17 +79,22 @@ The default API address `http://10.0.2.2:5285/` is the emulator route to the API
 
 ### Google sign-in
 
-The login screen (S03) uses Firebase Authentication. `android/app/google-services.json` is gitignored. The Google services plugin is `com.google.gms.google-services` 4.5.0, and the Firebase BoM is 34.19.0.
+The login screen (S03) uses Firebase Authentication. The Google services plugin is `com.google.gms.google-services` 4.5.0. It is declared in `android/build.gradle.kts` and applied in `android/app/build.gradle.kts`. The Firebase BoM is 34.19.0.
 
-1. The Firebase Android app package is `com.munipulse`. That is the application id in `android/app/build.gradle.kts`.
-2. From `android/`, run `.\gradlew.bat :app:signingReport` and register the debug SHA-1 on that Firebase app.
-3. Enable the Google sign-in provider. That creates a Web client ID.
-4. Download `google-services.json` again into `android/app/`, replacing the current file. Do not commit it. The file is only complete after the Web client appears under `oauth_client`.
-5. Rebuild and run on a device or emulator with Google Play. Tap **Continue with Google**.
+`android/app/google-services.json` is gitignored (`**/google-services.json` in the root `.gitignore`). Commit `android/app/google-services.json.example` only. That example uses package `com.munipulse` and placeholder values, with an empty `oauth_client`.
+
+1. Copy `android/app/google-services.json.example` to `android/app/google-services.json` if the real file is not there yet. Do not commit the copy.
+2. The Firebase Android app package is `com.munipulse`. That is the application id in `android/app/build.gradle.kts`.
+3. From `android/`, run `.\gradlew.bat :app:signingReport` and register the debug SHA-1 on that Firebase app.
+4. Enable the Google sign-in provider. That creates a Web client ID.
+5. Download `google-services.json` again into `android/app/`, replacing the local file. Do not commit it. The file is only complete after the Web client appears under `oauth_client`.
+6. Rebuild and run on a device or emulator with Google Play. Tap **Continue with Google**.
 
 After Google sign-in, the app sends the Firebase ID token to `POST /api/v1/auth/session`. The API JWT is stored in encrypted preferences and removed on sign-out. A later launch reuses it until it expires. Logs record the Firebase uid, the API user id, the HTTP method, path, status, and correlation id. They record an exception type when something fails. They do not record the Firebase ID token, the API JWT, the Authorization header, or a MongoDB connection string.
 
 Cold start stays on the splash while that session is checked. A valid session opens Home. With no session, first launch shows three onboarding pages (photo and GPS, crowd-rank, milestones), then the Google sign-in screen. Sign-out returns to sign-in and does not show those pages again.
+
+Home opens Settings. That screen shows the display name, a masked email, and the default ward (JHB-23, JHB-24, CPT-11, DBN-07, TSH-04). The ward choice is stored with the session on the device. Sign out is on Settings.
 
 Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
 

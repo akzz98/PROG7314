@@ -51,6 +51,11 @@ data class SessionRequest(val firebaseIdToken: String)
 
 data class SessionResponse(val accessToken: String, val expiresIn: Int, val user: SessionUser)
 
-data class SessionUser(val id: String)
+data class SessionUser(
+    val id: String,
+    val displayName: String? = null,
+    val email: String? = null,
+    val defaultWardCode: String? = null,
+)
 
 class SessionExchangeException(message: String) : IllegalStateException(message)
