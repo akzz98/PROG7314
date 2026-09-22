@@ -1,18 +1,47 @@
 # MuniPulse SA
 
-Citizen Service Delivery and Community Incident Tracker for South African wards.
+Citizen Service Delivery and Community Incident Tracker for South African wards. This repository is the Part 2 prototype for PROG7314 / OPSC7312, student Alton Muganda (St10263456), solo.
 
-Residents report municipal faults with a photo and a GPS fix, upvote duplicates into a ward signal, and follow a resolution timeline published by field workers. This repository is the Part 2 prototype for PROG7314 / OPSC7312, student Alton Muganda (St10263456), solo.
+## Purpose
+
+A resident signs in with Google, reports a municipal fault with a photo and a GPS fix, and sees the open reports in their ward. People upvote the same problem so it ranks as one ward signal. A field worker appends milestones, and the resident follows that timeline while online.
 
 ## Stack
 
 | Layer | Choice |
 | --- | --- |
-| Android | Kotlin, MVVM, Jetpack Compose, Coroutines, Retrofit 2 (from M4) |
-| Identity | Firebase Authentication, Google SSO (from M2) |
-| API | ASP.NET Core Web API (`net10.0`) |
-| Database | MongoDB Atlas (from M1) |
-| Photos in Part 2 | Multipart upload stored by the API (Azure Blob is Final POE) |
+| Android client | Kotlin, MVVM, Jetpack Compose, Coroutines and Flow, Retrofit 2 |
+| Session | Firebase Authentication with Google SSO, then an HMAC API JWT in encrypted preferences |
+| API | ASP.NET Core Web API on .NET 10 |
+| Database | MongoDB Atlas. Collections: `users`, `incidents`, `wards` |
+| Photos | JPEG multipart upload, stored by the API under `App_Data` |
+
+## Architecture
+
+The phone keeps UI state in ViewModels. Retrofit calls the API with the API JWT. Firebase is used only to obtain a Google ID token. `POST /api/v1/auth/session` exchanges that token for the API JWT. The API stores profiles and incidents in MongoDB and writes photo files to disk. A field worker publishes milestones with a field-worker JWT or the demo API key.
+
+```mermaid
+flowchart TB
+  subgraph client [Android app]
+    UI[Jetpack Compose screens]
+    VM[MVVM ViewModels]
+    HTTP[Retrofit]
+    UI --> VM --> HTTP
+  end
+
+  SSO[Firebase Authentication Google SSO]
+  VM -->|Google sign-in| SSO
+
+  subgraph server [MuniPulse.Api]
+    Routes["REST /api/v1"]
+  end
+
+  SSO -->|Firebase ID token| Routes
+  HTTP -->|Bearer API JWT| Routes
+  Routes --> Mongo[(MongoDB users incidents wards)]
+  Routes --> Disk[JPEG files in App_Data]
+  Marker[Field-worker demo key] -->|milestones| Routes
+```
 
 ## Part 2 and Final POE
 
