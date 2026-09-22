@@ -82,6 +82,10 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
 
     private val _detail = MutableStateFlow<IncidentDetailUi>(IncidentDetailUi.Idle)
     val detail: StateFlow<IncidentDetailUi> = _detail.asStateFlow()
+    private val _detailRefreshing = MutableStateFlow(false)
+    val detailRefreshing: StateFlow<Boolean> = _detailRefreshing.asStateFlow()
+    private val _detailRefreshNote = MutableStateFlow("")
+    val detailRefreshNote: StateFlow<String> = _detailRefreshNote.asStateFlow()
     private var detailGeneration = 0
     private val _nearby = MutableStateFlow<NearbyUi>(NearbyUi.Idle)
     val nearby: StateFlow<NearbyUi> = _nearby.asStateFlow()
@@ -290,15 +294,38 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun loadIncident(incidentId: String) {
+        fetchIncident(incidentId, refreshing = false)
+    }
+
+    fun refreshIncident(incidentId: String) {
+        val current = _detail.value as? IncidentDetailUi.Ready ?: return
+        if (current.item.id != incidentId.trim() || _detailRefreshing.value) {
+            return
+        }
+        fetchIncident(incidentId, refreshing = true)
+    }
+
+    private fun fetchIncident(incidentId: String, refreshing: Boolean) {
         val generation = ++detailGeneration
         val id = incidentId.trim()
+        val kept = if (refreshing) _detail.value as? IncidentDetailUi.Ready else null
         viewModelScope.launch {
-            _detail.value = IncidentDetailUi.Loading
+            if (refreshing) {
+                _detailRefreshing.value = true
+                _detailRefreshNote.value = ""
+            } else {
+                _detail.value = IncidentDetailUi.Loading
+            }
             val token = accessToken
             if (token.isNullOrBlank() || id.isEmpty()) {
                 Log.w(TAG, "Incident detail skipped. No API session")
                 if (generation == detailGeneration) {
-                    _detail.value = IncidentDetailUi.Failed(getApplication<Application>().getString(R.string.detail_failed))
+                    if (kept != null) {
+                        _detailRefreshNote.value = getApplication<Application>().getString(R.string.report_auth)
+                    } else {
+                        _detail.value = IncidentDetailUi.Failed(getApplication<Application>().getString(R.string.detail_failed))
+                    }
+                    _detailRefreshing.value = false
                 }
                 return@launch
             }
@@ -333,15 +360,25 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 if (generation != detailGeneration) {
                     return@launch
                 }
-                Log.i(TAG, "Incident detail loaded ${item.id}. Timeline ${item.timeline.size}")
+                val action = if (refreshing) "refreshed" else "loaded"
+                Log.i(TAG, "Incident detail $action ${item.id}. Timeline ${item.timeline.size}")
                 _detail.value = IncidentDetailUi.Ready(item)
+                _detailRefreshNote.value = ""
             } catch (error: Exception) {
                 if (generation != detailGeneration) {
                     return@launch
                 }
                 val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
                 Log.e(TAG, "Incident detail failed: $reason")
-                _detail.value = IncidentDetailUi.Failed(getApplication<Application>().getString(R.string.detail_failed))
+                if (kept != null) {
+                    _detailRefreshNote.value = getApplication<Application>().getString(R.string.detail_refresh_failed)
+                } else {
+                    _detail.value = IncidentDetailUi.Failed(getApplication<Application>().getString(R.string.detail_failed))
+                }
+            } finally {
+                if (generation == detailGeneration) {
+                    _detailRefreshing.value = false
+                }
             }
         }
     }
@@ -438,6 +475,8 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         detailGeneration++
         upvoteInFlight = false
         _upvoteBusy.value = false
+        _detailRefreshing.value = false
+        _detailRefreshNote.value = ""
         _detail.value = IncidentDetailUi.Idle
     }
 
@@ -538,6 +577,8 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         pulseGeneration++
         mineGeneration++
         detailGeneration++
+        _detailRefreshing.value = false
+        _detailRefreshNote.value = ""
         hotspotGeneration++
         nearbyGeneration++
         _nearby.value = NearbyUi.Idle

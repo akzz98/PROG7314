@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +53,9 @@ fun IncidentDetailScreen(
     onLoadPhoto: suspend (String) -> ByteArray?,
     upvoteBusy: Boolean,
     onUpvote: (String) -> Unit,
+    refreshing: Boolean,
+    refreshNote: String,
+    onRefresh: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -71,7 +75,15 @@ fun IncidentDetailScreen(
         when (detail) {
             IncidentDetailUi.Idle, IncidentDetailUi.Loading -> ListLoading()
             is IncidentDetailUi.Failed -> ListError(message = detail.message, onRetry = { onLoad(incidentId) })
-            is IncidentDetailUi.Ready -> DetailBody(detail.item, onLoadPhoto, upvoteBusy, onUpvote)
+            is IncidentDetailUi.Ready -> DetailBody(
+                detail.item,
+                onLoadPhoto,
+                upvoteBusy,
+                onUpvote,
+                refreshing,
+                refreshNote,
+                onRefresh,
+            )
         }
     }
 }
@@ -82,6 +94,9 @@ private fun DetailBody(
     onLoadPhoto: suspend (String) -> ByteArray?,
     upvoteBusy: Boolean,
     onUpvote: (String) -> Unit,
+    refreshing: Boolean,
+    refreshNote: String,
+    onRefresh: (String) -> Unit,
 ) {
     val category = categoryName(item.category)
     val title = if (item.place.isBlank()) category else "$category · ${item.place}"
@@ -121,7 +136,19 @@ private fun DetailBody(
         }
     }
     Spacer(modifier = Modifier.height(16.dp))
-    Text(text = stringResource(R.string.detail_timeline), style = MaterialTheme.typography.titleMedium)
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.detail_timeline),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = { onRefresh(item.id) }, enabled = !refreshing) {
+            Text(text = stringResource(if (refreshing) R.string.detail_refreshing else R.string.detail_refresh))
+        }
+    }
+    if (refreshNote.isNotBlank()) {
+        Text(text = refreshNote, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+    }
     if (item.timeline.isEmpty()) {
         Text(text = stringResource(R.string.detail_timeline_empty), style = MaterialTheme.typography.bodyLarge)
     } else {

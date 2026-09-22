@@ -42,6 +42,8 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     val mine by viewModel.mine.collectAsState()
     val mineStatus by viewModel.mineStatus.collectAsState()
     val detail by viewModel.detail.collectAsState()
+    val detailRefreshing by viewModel.detailRefreshing.collectAsState()
+    val detailRefreshNote by viewModel.detailRefreshNote.collectAsState()
     val upvoteBusy by viewModel.upvoteBusy.collectAsState()
     val hotspots by viewModel.hotspots.collectAsState()
     val nearby by viewModel.nearby.collectAsState()
@@ -118,6 +120,9 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             onLoadPhoto = viewModel::loadPhotoJpeg,
             upvoteBusy = upvoteBusy,
             onUpvote = viewModel::upvoteIncident,
+            refreshing = detailRefreshing,
+            refreshNote = detailRefreshNote,
+            onRefresh = viewModel::refreshIncident,
             onBack = {
                 detailId = null
                 viewModel.clearIncident()
