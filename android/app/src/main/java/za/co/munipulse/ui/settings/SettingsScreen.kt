@@ -129,6 +129,13 @@ fun SettingsScreen(
             detail = stringResource(R.string.settings_final_poe),
         )
         Spacer(modifier = Modifier.height(16.dp))
+        Text(text = stringResource(R.string.settings_privacy_title), style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = stringResource(R.string.settings_privacy_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
         Button(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
             Text(text = stringResource(R.string.sign_out))
         }

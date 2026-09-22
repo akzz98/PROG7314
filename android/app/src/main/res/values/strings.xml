@@ -20,6 +20,8 @@
     <string name="settings_biometric">Biometric unlock</string>
     <string name="settings_sync">Sync centre</string>
     <string name="settings_final_poe">Coming in Final POE</string>
+    <string name="settings_privacy_title">Privacy</string>
+    <string name="settings_privacy_body">Your name, email, ward, location, and photos are personal information under POPIA. This demo keeps them only while you use MuniPulse SA for the assignment. Location and photos are used to report a municipal fault, not for marketing.</string>
     <string name="notifications_title">Notifications</string>
     <string name="notifications_local_note">Saved on this device. Push alerts are not sent.</string>
     <string name="notifications_ticket_status">Ticket status</string>
