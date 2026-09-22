@@ -71,7 +71,17 @@ Demo wards seeded into MongoDB: `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, `TSH-04`
 
 Until M2, a Development host with `Auth:AllowDevBypass` set to true accepts `firebaseIdToken` values `dev-citizen` and `dev-field-worker` and returns an API JWT. Those aliases are refused in any other environment.
 
-Milestone calls from a marker can send `X-Demo-Api-Key` with the value stored in user-secrets. A citizen JWT receives `403`. A new report joins an open report in the same ward and category when it is within 250 metres and 14 days. Both then share an `aggregateId`. Otherwise `aggregateId` stays null. A stored photo's `url` is `/api/v1/incidents/photos/{id}`. Azure Blob is Final POE. Sending the same `clientMutationId` again returns `409 DUPLICATE_MUTATION` and does not create a second incident.
+### Milestone without a staff app
+
+API startup seeds a MongoDB user with Firebase uid `demo-field-worker` and role `FieldWorker`. There is no staff app.
+
+1. Set `FieldWorker:DemoApiKey` with the user-secrets command above. Leave the value out of git.
+2. Create an incident and copy its id.
+3. Send the call in `api/MuniPulse.Api/MuniPulse.Api.http`, with `X-Demo-Api-Key` set to that secret. Types are `Assigned`, `OnSite`, `Resolved`, and `Note`.
+
+A citizen API JWT on that route, without the demo key, receives `403 FORBIDDEN`. The log records the user id. It does not record the token or the key. A missing token receives `401`.
+
+A new report joins an open report in the same ward and category when it is within 250 metres and 14 days. Both then share an `aggregateId`. Otherwise `aggregateId` stays null. A stored photo's `url` is `/api/v1/incidents/photos/{id}`. Azure Blob is Final POE. Sending the same `clientMutationId` again returns `409 DUPLICATE_MUTATION` and does not create a second incident.
 
 Sample calls are in `api/MuniPulse.Api/MuniPulse.Api.http`.
 

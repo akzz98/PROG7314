@@ -1,5 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using MuniPulse.Api.Auth;
 using MuniPulse.Api.Data;
 using MuniPulse.Api.Errors;
@@ -589,7 +591,7 @@ public static class ApiEndpoints
         ILogger<IncidentStore> logger,
         CancellationToken cancellationToken)
     {
-        var actor = await ResolveFieldWorkerAsync(http, store, configuration, cancellationToken);
+        var actor = await ResolveFieldWorkerAsync(http, store, configuration, logger, cancellationToken);
         if (actor.Error is not null)
         {
             return actor.Error;
@@ -697,6 +699,7 @@ public static class ApiEndpoints
         HttpContext http,
         IncidentStore store,
         IConfiguration configuration,
+        ILogger logger,
         CancellationToken cancellationToken)
     {
         if (FieldWorkerKey.Matches(http, configuration))
@@ -716,6 +719,7 @@ public static class ApiEndpoints
 
         if (FieldWorkerKey.WasProvided(http))
         {
+            logger.LogInformation("Milestone rejected. Demo key did not match");
             var configured = !string.IsNullOrWhiteSpace(configuration["FieldWorker:DemoApiKey"]);
             return (null, ApiErrors.Result(
                 http,
@@ -726,6 +730,21 @@ public static class ApiEndpoints
                     : "The field worker demo key is not configured."));
         }
 
+        if (HasBearerToken(http))
+        {
+            var auth = await http.AuthenticateAsync(JwtBearerDefaults.AuthenticationScheme);
+            if (!auth.Succeeded || auth.Principal is null)
+            {
+                return (null, ApiErrors.Result(
+                    http,
+                    StatusCodes.Status401Unauthorized,
+                    "INVALID_TOKEN",
+                    "The access token is invalid or expired."));
+            }
+
+            http.User = auth.Principal;
+        }
+
         var user = await RequireUserAsync(http, store, cancellationToken);
         if (user is null)
         {
@@ -734,6 +753,7 @@ public static class ApiEndpoints
 
         if (!user.Roles.Contains(UserRoles.FieldWorker))
         {
+            logger.LogInformation("Milestone forbidden for user {UserId}", user.Id);
             return (null, ApiErrors.Result(
                 http,
                 StatusCodes.Status403Forbidden,
@@ -742,6 +762,18 @@ public static class ApiEndpoints
         }
 
         return (user, null);
+    }
+
+    private static bool HasBearerToken(HttpContext http)
+    {
+        if (!http.Request.Headers.TryGetValue("Authorization", out var values))
+        {
+            return false;
+        }
+
+        var header = values.ToString();
+        return header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            && header.Length > "Bearer ".Length;
     }
 
     private static Dictionary<string, string> ValidateCreate(CreateIncidentRequest request)

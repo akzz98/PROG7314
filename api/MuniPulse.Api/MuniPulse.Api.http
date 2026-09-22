@@ -43,7 +43,9 @@ Content-Type: application/json
   "clientMutationId": "device-uuid-1"
 }
 
-### Field worker milestone (header is the demo key from user-secrets, never commit it)
+### Field worker milestone
+# Use the demo key from user-secrets. Do not commit the value.
+# A citizen Bearer token on this route, without this header, returns 403 FORBIDDEN.
 POST {{host}}/api/v1/incidents/{{incidentId}}/milestones
 Content-Type: application/json
 X-Demo-Api-Key: {{fieldWorkerKey}}
