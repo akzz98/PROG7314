@@ -22,7 +22,7 @@ jobs:
           # The action's default list still asks for the removed "tools" package.
           packages: platform-tools
       - name: Install compile SDK 37
-        run: sdkmanager "platforms;android-37"
+        run: sdkmanager "platforms;android-37.0"
       - name: Use the placeholder Firebase file
         run: cp android/app/google-services.json.example android/app/google-services.json
       - name: Unit tests
