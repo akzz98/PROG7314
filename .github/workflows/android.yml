@@ -13,15 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          # The action's default list still asks for the removed "tools" package.
+          packages: platform-tools
       - name: Install compile SDK 37
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-37" "platform-tools"
+        run: sdkmanager "platforms;android-37"
       - name: Use the placeholder Firebase file
         run: cp android/app/google-services.json.example android/app/google-services.json
       - name: Unit tests
