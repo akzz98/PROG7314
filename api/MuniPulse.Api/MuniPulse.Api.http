@@ -1,0 +1,54 @@
+@host = http://localhost:5285
+
+### Health
+GET {{host}}/health
+Accept: application/json
+
+### Session — missing token (400 MISSING_TOKEN)
+POST {{host}}/api/v1/auth/session
+Content-Type: application/json
+
+{}
+
+### Session — Development bypass only (Auth:AllowDevBypass=true)
+# Aliases: dev-citizen, dev-field-worker. Firebase JWKS verification is M2.
+POST {{host}}/api/v1/auth/session
+Content-Type: application/json
+
+{
+  "firebaseIdToken": "dev-citizen"
+}
+
+### My profile
+GET {{host}}/api/v1/me
+Authorization: Bearer {{accessToken}}
+
+### Ward feed
+GET {{host}}/api/v1/incidents?scope=ward&wardCode=JHB-23
+Authorization: Bearer {{accessToken}}
+
+### Create incident
+POST {{host}}/api/v1/incidents
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "category": "Pothole",
+  "description": "Deep pothole outside clinic gate",
+  "latitude": -26.2041,
+  "longitude": 28.0473,
+  "accuracyMeters": 12.5,
+  "wardCode": "JHB-23",
+  "photoIds": [],
+  "clientMutationId": "device-uuid-1"
+}
+
+### Field worker milestone (header is the demo key from user-secrets, never commit it)
+POST {{host}}/api/v1/incidents/{{incidentId}}/milestones
+Content-Type: application/json
+X-Demo-Api-Key: {{fieldWorkerKey}}
+
+{
+  "type": "OnSite",
+  "note": "Valve isolated"
+}

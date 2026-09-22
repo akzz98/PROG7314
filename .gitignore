@@ -1,0 +1,46 @@
+# Local working notes (not part of the submission)
+CHECKLIST.md
+checklist.md
+.cursor/
+
+# Android
+**/.gradle/
+**/build/
+**/local.properties
+**/google-services.json
+*.apk
+*.aab
+*.ap_
+*.dex
+*.keystore
+*.jks
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# .NET build output and local secrets
+**/bin/
+**/obj/
+**/appsettings.Development.json
+**/appsettings.*.local.json
+**/secrets.json
+
+# Environment files
+.env
+.env.*
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
