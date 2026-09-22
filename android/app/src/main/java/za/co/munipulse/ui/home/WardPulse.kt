@@ -12,4 +12,5 @@ data class WardPulseItem(
     val category: String,
     val place: String,
     val upvoteCount: Int,
+    val viewerHasUpvoted: Boolean = false,
 )

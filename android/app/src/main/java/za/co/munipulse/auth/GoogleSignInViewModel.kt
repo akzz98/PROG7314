@@ -78,6 +78,9 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private val _detail = MutableStateFlow<IncidentDetailUi>(IncidentDetailUi.Idle)
     val detail: StateFlow<IncidentDetailUi> = _detail.asStateFlow()
     private var detailGeneration = 0
+    private val _upvoteBusy = MutableStateFlow(false)
+    val upvoteBusy: StateFlow<Boolean> = _upvoteBusy.asStateFlow()
+    private var upvoteInFlight = false
 
     fun updateNotifications(preferences: NotificationPreferences) {
         notificationStore.save(preferences)
@@ -199,6 +202,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                             category = item.category,
                             place = placeLabel(item.description),
                             upvoteCount = item.upvoteCount,
+                            viewerHasUpvoted = item.viewerHasUpvoted,
                         )
                     }
                 if (generation != pulseGeneration) {
@@ -254,6 +258,8 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                             category = item.category,
                             status = item.status,
                             createdAt = item.createdAt,
+                            upvoteCount = item.upvoteCount,
+                            viewerHasUpvoted = item.viewerHasUpvoted,
                         )
                     }
                 if (generation != mineGeneration) {
@@ -297,6 +303,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                     description = body.description.trim(),
                     status = body.status,
                     upvoteCount = body.upvoteCount,
+                    viewerHasUpvoted = body.viewerHasUpvoted,
                     photoIds = body.photos.orEmpty()
                         .filter { it.id.isNotBlank() && !it.url.isNullOrBlank() }
                         .map { it.id },
@@ -322,7 +329,88 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
 
     fun clearIncident() {
         detailGeneration++
+        upvoteInFlight = false
+        _upvoteBusy.value = false
         _detail.value = IncidentDetailUi.Idle
+    }
+
+    fun upvoteIncident(incidentId: String) {
+        val ready = _detail.value as? IncidentDetailUi.Ready ?: return
+        if (ready.item.id != incidentId || upvoteInFlight) {
+            return
+        }
+        if (ready.item.viewerHasUpvoted) {
+            Log.i(TAG, "Upvote already recorded $incidentId")
+            return
+        }
+        upvoteInFlight = true
+        _upvoteBusy.value = true
+        viewModelScope.launch {
+            val token = accessToken
+            try {
+                if (token.isNullOrBlank()) {
+                    Log.w(TAG, "Upvote skipped. No API session")
+                    applyUpvote(incidentId, ready.item.upvoteCount, voted = false, note = R.string.report_auth)
+                    return@launch
+                }
+                when (val outcome = IncidentClient.upvote(token, incidentId)) {
+                    is UpvoteOutcome.Counted -> {
+                        Log.i(TAG, "Upvote on $incidentId count ${outcome.upvoteCount}")
+                        applyUpvote(incidentId, outcome.upvoteCount, voted = true, note = 0)
+                    }
+                    UpvoteOutcome.Already -> {
+                        Log.i(TAG, "Upvote duplicate $incidentId")
+                        applyUpvote(incidentId, ready.item.upvoteCount, voted = true, note = R.string.upvote_already)
+                    }
+                }
+            } catch (error: Exception) {
+                val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
+                Log.e(TAG, "Upvote failed: $reason")
+                applyUpvote(incidentId, ready.item.upvoteCount, voted = false, note = R.string.upvote_failed)
+            } finally {
+                upvoteInFlight = false
+                _upvoteBusy.value = false
+            }
+        }
+    }
+
+    private fun applyUpvote(incidentId: String, upvoteCount: Int, voted: Boolean, note: Int) {
+        val ready = _detail.value as? IncidentDetailUi.Ready ?: return
+        if (ready.item.id != incidentId) {
+            return
+        }
+        val message = if (note == 0) "" else getApplication<Application>().getString(note)
+        _detail.value = IncidentDetailUi.Ready(
+            ready.item.copy(
+                upvoteCount = upvoteCount,
+                viewerHasUpvoted = voted,
+                upvoteNote = message,
+            ),
+        )
+        val pulse = _wardPulse.value
+        if (pulse is WardPulseUi.Ready) {
+            _wardPulse.value = pulse.copy(
+                items = pulse.items.map { item ->
+                    if (item.id == incidentId) {
+                        item.copy(upvoteCount = upvoteCount, viewerHasUpvoted = voted)
+                    } else {
+                        item
+                    }
+                },
+            )
+        }
+        val mine = _mine.value
+        if (mine is MyIncidentsUi.Ready) {
+            _mine.value = mine.copy(
+                items = mine.items.map { item ->
+                    if (item.id == incidentId) {
+                        item.copy(upvoteCount = upvoteCount, viewerHasUpvoted = voted)
+                    } else {
+                        item
+                    }
+                },
+            )
+        }
     }
 
     suspend fun loadPhotoJpeg(photoId: String): ByteArray? {
@@ -343,6 +431,8 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         pulseGeneration++
         mineGeneration++
         detailGeneration++
+        upvoteInFlight = false
+        _upvoteBusy.value = false
         _wardPulse.value = WardPulseUi.Idle
         _mine.value = MyIncidentsUi.Idle
         _mineStatus.value = null

@@ -69,6 +69,19 @@ object IncidentClient {
     suspend fun listMine(accessToken: String, status: String?): List<IncidentSummaryBody> =
         list(accessToken, "mine", null, status)
 
+    suspend fun upvote(accessToken: String, incidentId: String): UpvoteOutcome {
+        val response = api.upvote(bearer(accessToken), incidentId)
+        if (response.code() == 409 && errorCode(response) == "ALREADY_UPVOTED") {
+            return UpvoteOutcome.Already
+        }
+        if (!response.isSuccessful) {
+            throw incidentError(response)
+        }
+        val count = response.body()?.upvoteCount
+            ?: throw IncidentRequestException("EMPTY", "The upvote response was empty.")
+        return UpvoteOutcome.Counted(count)
+    }
+
     suspend fun detail(accessToken: String, incidentId: String): IncidentDetailBody {
         val response = api.detail(bearer(accessToken), incidentId)
         if (!response.isSuccessful) {
@@ -159,6 +172,12 @@ private interface IncidentApi {
         @Query("limit") limit: Int,
     ): Response<IncidentListBody>
 
+    @POST("api/v1/incidents/{id}/upvotes")
+    suspend fun upvote(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: String,
+    ): Response<UpvoteBody>
+
     @GET("api/v1/incidents/{id}")
     suspend fun detail(
         @Header("Authorization") authorization: String,
@@ -195,8 +214,16 @@ data class IncidentSummaryBody(
     val description: String = "",
     val status: String = "",
     val upvoteCount: Int = 0,
+    val viewerHasUpvoted: Boolean = false,
     val createdAt: String = "",
 )
+
+data class UpvoteBody(val upvoteCount: Int = 0)
+
+sealed interface UpvoteOutcome {
+    data class Counted(val upvoteCount: Int) : UpvoteOutcome
+    data object Already : UpvoteOutcome
+}
 
 data class IncidentDetailBody(
     val id: String = "",
@@ -204,6 +231,7 @@ data class IncidentDetailBody(
     val description: String = "",
     val status: String = "",
     val upvoteCount: Int = 0,
+    val viewerHasUpvoted: Boolean = false,
     val photos: List<PhotoLinkBody>? = emptyList(),
     val timeline: List<TimelineEventBody>? = emptyList(),
     val createdAt: String = "",

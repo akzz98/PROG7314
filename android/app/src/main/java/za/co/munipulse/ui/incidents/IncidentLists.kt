@@ -20,6 +20,8 @@ data class MyIncidentItem(
     val category: String,
     val status: String,
     val createdAt: String,
+    val upvoteCount: Int = 0,
+    val viewerHasUpvoted: Boolean = false,
 )
 
 sealed interface IncidentDetailUi {
@@ -36,6 +38,8 @@ data class IncidentDetailItem(
     val description: String,
     val status: String,
     val upvoteCount: Int,
+    val viewerHasUpvoted: Boolean,
+    val upvoteNote: String = "",
     val photoIds: List<String>,
     val timeline: List<TimelineLine>,
 )

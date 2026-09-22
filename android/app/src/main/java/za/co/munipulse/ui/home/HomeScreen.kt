@@ -272,10 +272,15 @@ private fun PulseCard(item: WardPulseItem, onOpen: () -> Unit) {
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f),
             )
-            Text(
-                text = stringResource(R.string.pulse_upvote, item.upvoteCount),
-                style = MaterialTheme.typography.titleMedium,
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = stringResource(R.string.pulse_upvote, item.upvoteCount),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                if (item.viewerHasUpvoted) {
+                    Text(text = stringResource(R.string.upvote_done), style = MaterialTheme.typography.labelMedium)
+                }
+            }
         }
     }
 }

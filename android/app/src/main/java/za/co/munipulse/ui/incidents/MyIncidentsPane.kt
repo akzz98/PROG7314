@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -107,8 +108,18 @@ private fun MineRow(item: MyIncidentItem, onOpen: () -> Unit) {
         "${statusLabel(item.status)} · $category · $whenLabel"
     }
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(text = stringResource(R.string.pulse_upvote, item.upvoteCount), style = MaterialTheme.typography.titleMedium)
+                if (item.viewerHasUpvoted) {
+                    Text(text = stringResource(R.string.upvote_done), style = MaterialTheme.typography.labelMedium)
+                }
+            }
         }
     }
 }

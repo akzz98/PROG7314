@@ -33,6 +33,11 @@
     <string name="hotspots_row">%1$d. %2$s ↑%3$d</string>
     <string name="hotspots_row_count">%1$d. %2$s · %3$d reports ↑%4$d</string>
     <string name="pulse_upvote">↑ %1$d</string>
+    <string name="upvote_action">Upvote</string>
+    <string name="upvote_done">You upvoted</string>
+    <string name="upvote_busy">Sending vote…</string>
+    <string name="upvote_already">You have already upvoted this incident.</string>
+    <string name="upvote_failed">The vote was not saved.</string>
     <string name="mine_title">My incidents</string>
     <string name="mine_filter">Filter: %1$s</string>
     <string name="mine_all">All</string>

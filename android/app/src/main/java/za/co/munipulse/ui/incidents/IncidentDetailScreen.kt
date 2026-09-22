@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +50,8 @@ fun IncidentDetailScreen(
     detail: IncidentDetailUi,
     onLoad: (String) -> Unit,
     onLoadPhoto: suspend (String) -> ByteArray?,
+    upvoteBusy: Boolean,
+    onUpvote: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -67,19 +71,37 @@ fun IncidentDetailScreen(
         when (detail) {
             IncidentDetailUi.Idle, IncidentDetailUi.Loading -> ListLoading()
             is IncidentDetailUi.Failed -> ListError(message = detail.message, onRetry = { onLoad(incidentId) })
-            is IncidentDetailUi.Ready -> DetailBody(detail.item, onLoadPhoto)
+            is IncidentDetailUi.Ready -> DetailBody(detail.item, onLoadPhoto, upvoteBusy, onUpvote)
         }
     }
 }
 
 @Composable
-private fun DetailBody(item: IncidentDetailItem, onLoadPhoto: suspend (String) -> ByteArray?) {
+private fun DetailBody(
+    item: IncidentDetailItem,
+    onLoadPhoto: suspend (String) -> ByteArray?,
+    upvoteBusy: Boolean,
+    onUpvote: (String) -> Unit,
+) {
     val category = categoryName(item.category)
     val title = if (item.place.isBlank()) category else "$category · ${item.place}"
     Text(text = title, style = MaterialTheme.typography.headlineSmall)
     Spacer(modifier = Modifier.height(8.dp))
     Text(text = stringResource(R.string.detail_status, statusLabel(item.status)), style = MaterialTheme.typography.titleMedium)
-    Text(text = stringResource(R.string.pulse_upvote, item.upvoteCount), style = MaterialTheme.typography.titleMedium)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(text = stringResource(R.string.pulse_upvote, item.upvoteCount), style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.width(12.dp))
+        if (item.viewerHasUpvoted) {
+            Text(text = stringResource(R.string.upvote_done), style = MaterialTheme.typography.titleMedium)
+        } else {
+            Button(onClick = { onUpvote(item.id) }, enabled = !upvoteBusy) {
+                Text(text = stringResource(if (upvoteBusy) R.string.upvote_busy else R.string.upvote_action))
+            }
+        }
+    }
+    if (item.upvoteNote.isNotBlank()) {
+        Text(text = item.upvoteNote, style = MaterialTheme.typography.bodyMedium)
+    }
     if (item.description.isNotBlank()) {
         Spacer(modifier = Modifier.height(12.dp))
         Text(text = item.description, style = MaterialTheme.typography.bodyLarge)
