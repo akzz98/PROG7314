@@ -29,17 +29,35 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     val state: StateFlow<SignInUiState> = _state.asStateFlow()
 
     private val sessionStore = SessionStore(application)
+    private val onboardingStore = OnboardingStore(application)
     private var accessToken: String? = null
+
+    private val _restoring = MutableStateFlow(false)
+    val restoring: StateFlow<Boolean> = _restoring.asStateFlow()
+
+    private val _onboardingComplete = MutableStateFlow(onboardingStore.isComplete())
+    val onboardingComplete: StateFlow<Boolean> = _onboardingComplete.asStateFlow()
+
+    fun finishOnboarding() {
+        if (_onboardingComplete.value) {
+            return
+        }
+        onboardingStore.markComplete()
+        _onboardingComplete.value = true
+        Log.i(TAG, "Onboarding gate finished; login is next")
+    }
 
     fun refresh() {
         val context = getApplication<Application>()
         if (!GoogleSignIn.isConfigured(context)) {
             Log.i(TAG, "Firebase config is missing; Google sign-in stays disabled")
+            _restoring.value = false
             _state.value = SignInUiState.MissingConfig
             return
         }
         if (!GoogleSignIn.hasWebClient(context)) {
             Log.w(TAG, "Firebase is configured but the Google Web client id is missing")
+            _restoring.value = false
             _state.value = SignInUiState.MissingWebClient
             return
         }
@@ -47,6 +65,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         if (user == null) {
             sessionStore.clear()
             accessToken = null
+            _restoring.value = false
             _state.value = SignInUiState.Ready
             return
         }
@@ -54,6 +73,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         val stored = sessionStore.read()
         if (stored != null && !stored.isExpired()) {
             accessToken = stored.accessToken
+            _restoring.value = false
             Log.i(TAG, "Restored API session for user ${stored.userId}")
             _state.value = signedIn(
                 stored.displayName.ifBlank { user.displayName },
@@ -62,6 +82,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             )
             return
         }
+        _restoring.value = true
         exchangeSession(user)
     }
 
@@ -101,6 +122,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         _state.value = SignInUiState.Working
         viewModelScope.launch {
             _state.value = sessionState(user)
+            _restoring.value = false
         }
     }
 

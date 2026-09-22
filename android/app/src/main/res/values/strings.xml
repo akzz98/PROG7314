@@ -8,7 +8,10 @@
     <string name="login_web_client_missing">Firebase is connected, but Google sign-in is not finished. Add the debug SHA-1, enable the Google provider, then download google-services.json again.</string>
     <string name="login_cancelled">Sign-in was cancelled.</string>
     <string name="login_failed">Google sign-in did not finish. Try again.</string>
-    <string name="signed_in_title">Signed in</string>
+    <string name="home_title">Home</string>
+    <string name="onboarding_title">Before you report</string>
+    <string name="onboarding_body">MuniPulse SA is for photo and GPS reports in your ward. Continue to sign in with Google.</string>
+    <string name="onboarding_continue">Continue</string>
     <string name="session_ready">API session is ready.</string>
     <string name="session_failed">Google sign-in worked, but the API session did not. Check that the API is running.</string>
     <string name="sign_out">Sign out</string>

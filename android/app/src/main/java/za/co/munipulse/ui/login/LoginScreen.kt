@@ -71,33 +71,3 @@ fun LoginScreen(
         }
     }
 }
-
-@Composable
-fun SignedInScreen(
-    displayName: String,
-    email: String,
-    sessionNote: String,
-    onSignOut: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(text = stringResource(R.string.signed_in_title), style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(text = displayName, style = MaterialTheme.typography.titleLarge)
-        if (email.isNotEmpty()) {
-            Text(text = email, style = MaterialTheme.typography.bodyLarge)
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(text = sessionNote, style = MaterialTheme.typography.bodyMedium)
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
-            Text(text = stringResource(R.string.sign_out))
-        }
-    }
-}

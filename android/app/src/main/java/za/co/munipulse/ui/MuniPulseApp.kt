@@ -12,34 +12,46 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import za.co.munipulse.auth.GoogleSignInViewModel
 import za.co.munipulse.auth.SignInUiState
+import za.co.munipulse.ui.home.HomeScreen
 import za.co.munipulse.ui.login.LoginScreen
-import za.co.munipulse.ui.login.SignedInScreen
+import za.co.munipulse.ui.onboarding.OnboardingScreen
 import za.co.munipulse.ui.splash.SplashScreen
 
 @Composable
 fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
-    var showSplash by remember { mutableStateOf(true) }
+    var splashHold by remember { mutableStateOf(true) }
     val state by viewModel.state.collectAsState()
+    val restoring by viewModel.restoring.collectAsState()
+    val onboardingDone by viewModel.onboardingComplete.collectAsState()
+    val showSplash = splashHold || state is SignInUiState.Checking || restoring
 
     LaunchedEffect(Unit) {
         delay(SPLASH_MILLIS)
         viewModel.refresh()
-        showSplash = false
-        Log.i(TAG, "Left splash for Google sign-in")
+        splashHold = false
     }
 
-    if (showSplash || state is SignInUiState.Checking) {
-        SplashScreen()
-        return
+    LaunchedEffect(showSplash) {
+        if (!showSplash) {
+            val route = when {
+                state is SignInUiState.SignedIn -> "home"
+                !onboardingDone -> "onboarding"
+                else -> "login"
+            }
+            Log.i(TAG, "Splash routed to $route")
+        }
     }
 
-    when (val current = state) {
-        is SignInUiState.SignedIn -> SignedInScreen(
+    val current = state
+    when {
+        showSplash -> SplashScreen()
+        current is SignInUiState.SignedIn -> HomeScreen(
             displayName = current.displayName,
             email = current.email,
             sessionNote = current.sessionNote,
             onSignOut = viewModel::signOut,
         )
+        !onboardingDone -> OnboardingScreen(onContinue = viewModel::finishOnboarding)
         else -> LoginScreen(
             state = current,
             onGoogleSignIn = viewModel::signIn,
