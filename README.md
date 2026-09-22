@@ -87,7 +87,9 @@ The login screen (S03) uses Firebase Authentication. `android/app/google-service
 4. Download `google-services.json` again into `android/app/`, replacing the current file. Do not commit it. The file is only complete after the Web client appears under `oauth_client`.
 5. Rebuild and run on a device or emulator with Google Play. Tap **Continue with Google**.
 
-After Google sign-in, the app sends the Firebase ID token to `POST /api/v1/auth/session` and keeps the API JWT in memory. Saving that session across restarts is the next auth task. Logs record the Firebase uid and the API user id, never either token.
+After Google sign-in, the app sends the Firebase ID token to `POST /api/v1/auth/session`. The API JWT is stored in encrypted preferences and removed on sign-out. A later launch reuses it until it expires. Logs record the Firebase uid and the API user id, never either token.
+
+Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
 
 `Firebase:ProjectId` in `appsettings.json` must match the Firebase project (`munipulse-987ce`). The API still needs `Jwt:SigningKey` in user-secrets before it can issue a session.
 

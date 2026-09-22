@@ -28,7 +28,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private val _state = MutableStateFlow<SignInUiState>(SignInUiState.Checking)
     val state: StateFlow<SignInUiState> = _state.asStateFlow()
 
-    // Held for the next task, which persists the session. Not shown in the UI and not logged.
+    private val sessionStore = SessionStore(application)
     private var accessToken: String? = null
 
     fun refresh() {
@@ -45,10 +45,23 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         }
         val user = GoogleSignIn.currentUser(context)
         if (user == null) {
+            sessionStore.clear()
+            accessToken = null
             _state.value = SignInUiState.Ready
             return
         }
         Log.i(TAG, "Existing Firebase user uid ${user.uid}")
+        val stored = sessionStore.read()
+        if (stored != null && !stored.isExpired()) {
+            accessToken = stored.accessToken
+            Log.i(TAG, "Restored API session for user ${stored.userId}")
+            _state.value = signedIn(
+                stored.displayName.ifBlank { user.displayName },
+                stored.email.ifBlank { user.email },
+                context.getString(R.string.session_ready),
+            )
+            return
+        }
         exchangeSession(user)
     }
 
@@ -78,7 +91,9 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
 
     fun signOut() {
         accessToken = null
+        sessionStore.clear()
         GoogleSignIn.signOut(getApplication())
+        Log.i(TAG, "Signed out")
         refresh()
     }
 
@@ -95,10 +110,14 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 ?: throw SessionExchangeException("Firebase did not return an ID token.")
             val session = SessionClient.exchange(idToken)
             accessToken = session.accessToken
+            val name = user.displayName?.takeIf { it.isNotBlank() } ?: "Google account"
+            val email = user.email.orEmpty()
+            sessionStore.save(session, name, email)
             Log.i(TAG, "API session issued for user ${session.user.id}")
             getApplication<Application>().getString(R.string.session_ready)
         } catch (error: Exception) {
             accessToken = null
+            sessionStore.clear()
             Log.e(TAG, "API session exchange failed: ${error.javaClass.simpleName}")
             if (error is SessionExchangeException) error.message else {
                 getApplication<Application>().getString(R.string.session_failed)
