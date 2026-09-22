@@ -29,6 +29,7 @@ import za.co.munipulse.ui.incidents.IncidentDetailItem
 import za.co.munipulse.ui.incidents.IncidentDetailUi
 import za.co.munipulse.ui.incidents.MyIncidentItem
 import za.co.munipulse.ui.incidents.MyIncidentsUi
+import za.co.munipulse.ui.incidents.IncidentTime
 import za.co.munipulse.ui.incidents.TimelineLine
 import za.co.munipulse.ui.incidents.WardHotspotsUi
 
@@ -318,9 +319,16 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                     photoIds = body.photos.orEmpty()
                         .filter { it.id.isNotBlank() && !it.url.isNullOrBlank() }
                         .map { it.id },
-                    timeline = body.timeline.orEmpty().map { event ->
-                        TimelineLine(at = event.at, type = event.type, note = event.note.trim())
-                    },
+                    timeline = body.timeline.orEmpty()
+                        .map { event ->
+                            TimelineLine(
+                                at = event.at,
+                                type = event.type,
+                                note = event.note.trim(),
+                                actorRole = event.actorRole,
+                            )
+                        }
+                        .sortedBy { IncidentTime.epochMillis(it.at) },
                 )
                 if (generation != detailGeneration) {
                     return@launch

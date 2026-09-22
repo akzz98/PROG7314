@@ -128,8 +128,11 @@ private fun DetailBody(
         item.timeline.forEach { line ->
             val clock = IncidentTime.clockLabel(line.at)
             val label = timelineLabel(line.type)
-            val heading = if (clock.isBlank()) label else "$label — $clock"
+            val heading = if (clock.isBlank()) "• $label" else "• $label — $clock"
             Text(text = heading, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 8.dp))
+            if (line.actorRole.isNotBlank()) {
+                Text(text = roleLabel(line.actorRole), style = MaterialTheme.typography.bodyMedium)
+            }
             if (line.note.isNotBlank()) {
                 Text(text = line.note, style = MaterialTheme.typography.bodyMedium)
             }
@@ -163,6 +166,14 @@ private fun DetailPhoto(photoId: String, onLoadPhoto: suspend (String) -> ByteAr
             CircularProgressIndicator()
         }
     }
+}
+
+@Composable
+private fun roleLabel(role: String): String = when (role) {
+    "FieldWorker" -> stringResource(R.string.role_field_worker)
+    "WardLead" -> stringResource(R.string.role_ward_lead)
+    "Citizen" -> stringResource(R.string.role_citizen)
+    else -> role
 }
 
 @Composable

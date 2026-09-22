@@ -53,6 +53,9 @@
     <string name="detail_status">Status: %1$s</string>
     <string name="detail_failed">This incident did not load.</string>
     <string name="detail_timeline">Timeline</string>
+    <string name="role_citizen">Citizen</string>
+    <string name="role_field_worker">Field worker</string>
+    <string name="role_ward_lead">Ward lead</string>
     <string name="detail_timeline_empty">No updates yet.</string>
     <string name="detail_map">Map snippet comes in Final POE.</string>
     <string name="timeline_logged">Logged</string>

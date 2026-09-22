@@ -661,12 +661,22 @@ public static class ApiEndpoints
             return ApiErrors.Result(http, StatusCodes.Status404NotFound, "NOT_FOUND", "That incident does not exist.");
         }
 
-        logger.LogInformation(
-            "Milestone {MilestoneType} appended to incident {IncidentId}",
-            saved.Type,
-            id);
+        var updated = await store.FindIncidentAsync(id, cancellationToken);
+        var ordered = (updated?.Timeline ?? [saved])
+            .OrderBy(entry => entry.At)
+            .ThenBy(entry => entry.Type, StringComparer.Ordinal)
+            .Select(ToTimeline)
+            .ToArray();
 
-        return Results.Created($"/api/v1/incidents/{id}", ToTimeline(saved));
+        logger.LogInformation(
+            "Milestone {MilestoneType} appended to incident {IncidentId}. Timeline {TimelineCount}",
+            saved.Type,
+            id,
+            ordered.Length);
+
+        return Results.Created(
+            $"/api/v1/incidents/{id}",
+            new MilestoneCreatedResponse(updated?.Status ?? status, ordered));
     }
 
     private static async Task<UserProfile?> RequireUserAsync(
@@ -959,5 +969,7 @@ public sealed record IncidentDetail(
     DateTime CreatedAt);
 
 public sealed record PhotoLink(string Id, string? Url);
+
+public sealed record MilestoneCreatedResponse(string Status, TimelineEventResponse[] Timeline);
 
 public sealed record TimelineEventResponse(DateTime At, string Type, string Note, string ActorRole);

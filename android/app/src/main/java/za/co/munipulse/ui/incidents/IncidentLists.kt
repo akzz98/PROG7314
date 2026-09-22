@@ -65,6 +65,7 @@ data class TimelineLine(
     val at: String,
     val type: String,
     val note: String,
+    val actorRole: String,
 )
 
 object IncidentTime {
@@ -80,6 +81,8 @@ object IncidentTime {
             else -> day.format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))
         }
     }
+
+    fun epochMillis(value: String): Long = parse(value)?.toEpochMilli() ?: Long.MAX_VALUE
 
     fun clockLabel(value: String): String {
         val instant = parse(value) ?: return ""
