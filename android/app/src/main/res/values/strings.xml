@@ -9,9 +9,15 @@
     <string name="login_cancelled">Sign-in was cancelled.</string>
     <string name="login_failed">Google sign-in did not finish. Try again.</string>
     <string name="home_title">Home</string>
-    <string name="onboarding_title">Before you report</string>
-    <string name="onboarding_body">MuniPulse SA is for photo and GPS reports in your ward. Continue to sign in with Google.</string>
+    <string name="onboarding_page1_title">Report with photo + GPS</string>
+    <string name="onboarding_page1_body">Add a photo and your location when you report a problem in the ward.</string>
+    <string name="onboarding_page2_title">Crowd-rank ward urgency</string>
+    <string name="onboarding_page2_body">Upvote open incidents so the ward can see what needs attention first.</string>
+    <string name="onboarding_page3_title">Follow live milestones</string>
+    <string name="onboarding_page3_body">Watch a report move from submitted, to on site, to resolved.</string>
+    <string name="onboarding_next">Next</string>
     <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_page_dot">Page %1$d of %2$d</string>
     <string name="session_ready">API session is ready.</string>
     <string name="session_failed">Google sign-in worked, but the API session did not. Check that the API is running.</string>
     <string name="sign_out">Sign out</string>

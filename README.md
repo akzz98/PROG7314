@@ -89,7 +89,7 @@ The login screen (S03) uses Firebase Authentication. `android/app/google-service
 
 After Google sign-in, the app sends the Firebase ID token to `POST /api/v1/auth/session`. The API JWT is stored in encrypted preferences and removed on sign-out. A later launch reuses it until it expires. Logs record the Firebase uid and the API user id, never either token.
 
-Cold start stays on the splash while that session is checked. A valid session opens Home. With no session, the app shows the onboarding gate once, then the Google sign-in screen. Sign-out returns to sign-in and does not show the gate again.
+Cold start stays on the splash while that session is checked. A valid session opens Home. With no session, first launch shows three onboarding pages (photo and GPS, crowd-rank, milestones), then the Google sign-in screen. Sign-out returns to sign-in and does not show those pages again.
 
 Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
 

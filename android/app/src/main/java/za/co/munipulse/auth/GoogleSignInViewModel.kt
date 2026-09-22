@@ -44,7 +44,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         }
         onboardingStore.markComplete()
         _onboardingComplete.value = true
-        Log.i(TAG, "Onboarding gate finished; login is next")
+        Log.i(TAG, "Onboarding finished; login is next")
     }
 
     fun refresh() {
