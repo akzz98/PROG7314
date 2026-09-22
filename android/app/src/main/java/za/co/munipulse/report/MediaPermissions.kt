@@ -9,7 +9,7 @@ import androidx.core.content.ContextCompat
 
 data class MediaAccess(val camera: Boolean, val gallery: Boolean)
 
-// Camera and gallery only. Location is a later reporting step.
+// Camera and gallery. Location is handled beside this, on the same report step.
 object MediaPermissions {
     fun camera(): String = Manifest.permission.CAMERA
 

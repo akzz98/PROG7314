@@ -18,6 +18,13 @@
     <string name="media_camera_denied">Camera access was denied. You can still use the app.</string>
     <string name="media_gallery_denied">Gallery access was denied. You can still use the app.</string>
     <string name="media_both_denied">Camera and gallery access were denied. You can still use the app.</string>
+    <string name="location_title">Location</string>
+    <string name="location_rationale">The report needs where the fault is. MuniPulse reads latitude, longitude, and how accurate that fix is. It is used only for that report.</string>
+    <string name="location_allow">Use my location</string>
+    <string name="location_reading">Reading location…</string>
+    <string name="location_denied">Location access was denied. You can still use the app.</string>
+    <string name="location_missing">Location is allowed, but no fix was available. Turn location on and try again.</string>
+    <string name="location_fix">Latitude %1$.5f, longitude %2$.5f, accuracy %3$.0f m</string>
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
     <string name="settings_account">Account</string>
