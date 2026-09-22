@@ -88,6 +88,9 @@ private fun DetailBody(
     Text(text = title, style = MaterialTheme.typography.headlineSmall)
     Spacer(modifier = Modifier.height(8.dp))
     Text(text = stringResource(R.string.detail_status, statusLabel(item.status)), style = MaterialTheme.typography.titleMedium)
+    if (item.grouped) {
+        Text(text = stringResource(R.string.detail_grouped), style = MaterialTheme.typography.bodyMedium)
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(text = stringResource(R.string.pulse_upvote, item.upvoteCount), style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.width(12.dp))

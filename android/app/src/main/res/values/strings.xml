@@ -29,7 +29,9 @@
     <string name="list_empty_body">Report the first fault in your street.</string>
     <string name="hotspots_open">Ward hotspots</string>
     <string name="hotspots_title">%1$s hotspots</string>
-    <string name="hotspots_note">Open reports in this ward, grouped by category. Combined hotspots are the next milestone.</string>
+    <string name="hotspots_note">Open reports within 250 m, the same category, and the last 14 days share one group.</string>
+    <string name="hotspots_failed">The hotspot list did not load.</string>
+    <string name="detail_grouped">This report is grouped with nearby reports in the ward.</string>
     <string name="hotspots_row">%1$d. %2$s ↑%3$d</string>
     <string name="hotspots_row_count">%1$d. %2$s · %3$d reports ↑%4$d</string>
     <string name="pulse_upvote">↑ %1$d</string>

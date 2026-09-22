@@ -22,11 +22,13 @@ import za.co.munipulse.report.IncidentValidator
 import za.co.munipulse.report.PhotoFiles
 import za.co.munipulse.ui.home.WardPulseItem
 import za.co.munipulse.ui.home.WardPulseUi
+import za.co.munipulse.ui.incidents.HotspotGroup
 import za.co.munipulse.ui.incidents.IncidentDetailItem
 import za.co.munipulse.ui.incidents.IncidentDetailUi
 import za.co.munipulse.ui.incidents.MyIncidentItem
 import za.co.munipulse.ui.incidents.MyIncidentsUi
 import za.co.munipulse.ui.incidents.TimelineLine
+import za.co.munipulse.ui.incidents.WardHotspotsUi
 
 sealed interface SignInUiState {
     data object Checking : SignInUiState
@@ -78,6 +80,9 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private val _detail = MutableStateFlow<IncidentDetailUi>(IncidentDetailUi.Idle)
     val detail: StateFlow<IncidentDetailUi> = _detail.asStateFlow()
     private var detailGeneration = 0
+    private val _hotspots = MutableStateFlow<WardHotspotsUi>(WardHotspotsUi.Idle)
+    val hotspots: StateFlow<WardHotspotsUi> = _hotspots.asStateFlow()
+    private var hotspotGeneration = 0
     private val _upvoteBusy = MutableStateFlow(false)
     val upvoteBusy: StateFlow<Boolean> = _upvoteBusy.asStateFlow()
     private var upvoteInFlight = false
@@ -304,6 +309,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                     status = body.status,
                     upvoteCount = body.upvoteCount,
                     viewerHasUpvoted = body.viewerHasUpvoted,
+                    grouped = !body.aggregateId.isNullOrBlank(),
                     photoIds = body.photos.orEmpty()
                         .filter { it.id.isNotBlank() && !it.url.isNullOrBlank() }
                         .map { it.id },
@@ -323,6 +329,48 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
                 Log.e(TAG, "Incident detail failed: $reason")
                 _detail.value = IncidentDetailUi.Failed(getApplication<Application>().getString(R.string.detail_failed))
+            }
+        }
+    }
+
+    fun refreshHotspots(wardCode: String) {
+        val generation = ++hotspotGeneration
+        val ward = WardCatalog.normalize(wardCode)
+        viewModelScope.launch {
+            _hotspots.value = WardHotspotsUi.Loading
+            val token = accessToken
+            if (token.isNullOrBlank()) {
+                Log.w(TAG, "Ward hotspots skipped. No API session")
+                if (generation == hotspotGeneration) {
+                    _hotspots.value = WardHotspotsUi.Failed(getApplication<Application>().getString(R.string.report_auth))
+                }
+                return@launch
+            }
+            try {
+                val groups = IncidentClient.listAggregates(token, ward)
+                    .filter { it.aggregateId.isNotBlank() && it.incidentId.isNotBlank() }
+                    .mapIndexed { index, group ->
+                        HotspotGroup(
+                            aggregateId = group.aggregateId,
+                            category = group.category,
+                            reportCount = group.reportCount,
+                            upvoteCount = group.upvoteCount,
+                            incidentId = group.incidentId,
+                            rank = index + 1,
+                        )
+                    }
+                if (generation != hotspotGeneration) {
+                    return@launch
+                }
+                Log.i(TAG, "Ward hotspots loaded. Ward $ward. Groups ${groups.size}")
+                _hotspots.value = WardHotspotsUi.Ready(groups)
+            } catch (error: Exception) {
+                if (generation != hotspotGeneration) {
+                    return@launch
+                }
+                val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
+                Log.e(TAG, "Ward hotspots failed: $reason")
+                _hotspots.value = WardHotspotsUi.Failed(getApplication<Application>().getString(R.string.hotspots_failed))
             }
         }
     }
@@ -431,8 +479,10 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         pulseGeneration++
         mineGeneration++
         detailGeneration++
+        hotspotGeneration++
         upvoteInFlight = false
         _upvoteBusy.value = false
+        _hotspots.value = WardHotspotsUi.Idle
         _wardPulse.value = WardPulseUi.Idle
         _mine.value = MyIncidentsUi.Idle
         _mineStatus.value = null

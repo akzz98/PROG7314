@@ -43,6 +43,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     val mineStatus by viewModel.mineStatus.collectAsState()
     val detail by viewModel.detail.collectAsState()
     val upvoteBusy by viewModel.upvoteBusy.collectAsState()
+    val hotspots by viewModel.hotspots.collectAsState()
     val showSplash = splashHold || state is SignInUiState.Checking || restoring
 
     LaunchedEffect(Unit) {
@@ -117,8 +118,8 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
         )
         current is SignInUiState.SignedIn && showHotspots -> WardHotspotsScreen(
             wardCode = current.defaultWardCode,
-            pulse = wardPulse,
-            onRefresh = viewModel::refreshWardPulse,
+            hotspots = hotspots,
+            onRefresh = viewModel::refreshHotspots,
             onOpenIncident = { detailId = it },
             onOpenReport = { showReport = true },
             onBack = { showHotspots = false },

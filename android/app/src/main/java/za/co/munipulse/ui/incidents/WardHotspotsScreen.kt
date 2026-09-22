@@ -22,7 +22,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -31,14 +30,12 @@ import za.co.munipulse.auth.WardCatalog
 import za.co.munipulse.ui.common.ListEmpty
 import za.co.munipulse.ui.common.ListError
 import za.co.munipulse.ui.common.ListLoading
-import za.co.munipulse.ui.home.WardPulseItem
-import za.co.munipulse.ui.home.WardPulseUi
 import za.co.munipulse.ui.home.categoryName
 
 @Composable
 fun WardHotspotsScreen(
     wardCode: String,
-    pulse: WardPulseUi,
+    hotspots: WardHotspotsUi,
     onRefresh: (String) -> Unit,
     onOpenIncident: (String) -> Unit,
     onOpenReport: () -> Unit,
@@ -66,11 +63,11 @@ fun WardHotspotsScreen(
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = stringResource(R.string.hotspots_note), style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.height(12.dp))
-        when (pulse) {
-            WardPulseUi.Idle, WardPulseUi.Loading -> ListLoading()
-            is WardPulseUi.Failed -> ListError(message = pulse.message, onRetry = { onRefresh(wardCode) })
-            is WardPulseUi.Ready -> {
-                if (pulse.items.isEmpty()) {
+        when (hotspots) {
+            WardHotspotsUi.Idle, WardHotspotsUi.Loading -> ListLoading()
+            is WardHotspotsUi.Failed -> ListError(message = hotspots.message, onRetry = { onRefresh(wardCode) })
+            is WardHotspotsUi.Ready -> {
+                if (hotspots.items.isEmpty()) {
                     ListEmpty(
                         title = stringResource(R.string.pulse_empty),
                         body = stringResource(R.string.list_empty_body),
@@ -78,7 +75,11 @@ fun WardHotspotsScreen(
                         onAction = onOpenReport,
                     )
                 } else {
-                    HotspotList(pulse.items, onOpenIncident)
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(hotspots.items, key = { it.aggregateId }) { row ->
+                            HotspotRow(row, onOpen = { onOpenIncident(row.incidentId) })
+                        }
+                    }
                 }
             }
         }
@@ -86,45 +87,18 @@ fun WardHotspotsScreen(
 }
 
 @Composable
-private fun HotspotList(items: List<WardPulseItem>, onOpenIncident: (String) -> Unit) {
-    val rows = remember(items) { hotspotRows(items) }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(rows, key = { it.category }) { row ->
-            val category = categoryName(row.category)
-            val title = if (row.reportCount == 1) {
-                stringResource(R.string.hotspots_row, row.rank, category, row.upvoteCount)
-            } else {
-                stringResource(R.string.hotspots_row_count, row.rank, category, row.reportCount, row.upvoteCount)
-            }
-            Card(modifier = Modifier.fillMaxWidth().clickable { onOpenIncident(row.incidentId) }) {
-                Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text(text = title, style = MaterialTheme.typography.bodyLarge)
-                }
-            }
+private fun HotspotRow(row: HotspotGroup, onOpen: () -> Unit) {
+    val category = categoryName(row.category)
+    val title = if (row.reportCount == 1) {
+        stringResource(R.string.hotspots_row, row.rank, category, row.upvoteCount)
+    } else {
+        stringResource(R.string.hotspots_row_count, row.rank, category, row.reportCount, row.upvoteCount)
+    }
+    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
-
-private fun hotspotRows(items: List<WardPulseItem>): List<HotspotRow> =
-    items.groupBy { it.category }
-        .map { (category, group) ->
-            val top = group.maxWith(compareByDescending<WardPulseItem> { it.upvoteCount }.thenBy { it.id })
-            HotspotRow(
-                category = category,
-                reportCount = group.size,
-                upvoteCount = group.sumOf { it.upvoteCount },
-                incidentId = top.id,
-            )
-        }
-        .sortedWith(compareByDescending<HotspotRow> { it.upvoteCount }.thenBy { it.category })
-        .mapIndexed { index, row -> row.copy(rank = index + 1) }
-
-private data class HotspotRow(
-    val rank: Int = 0,
-    val category: String,
-    val reportCount: Int,
-    val upvoteCount: Int,
-    val incidentId: String,
-)
 
 private const val TAG = "MuniPulseHome"

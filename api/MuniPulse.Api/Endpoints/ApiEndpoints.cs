@@ -18,6 +18,7 @@ public static class ApiEndpoints
         api.MapPost("/incidents", CreateIncident).RequireAuthorization().RequireRateLimiting("writes");
         api.MapPost("/incidents/photos", UploadPhotos).RequireAuthorization().RequireRateLimiting("writes").DisableAntiforgery();
         api.MapGet("/incidents/photos/{id}", GetPhoto).RequireAuthorization();
+        api.MapGet("/incidents/aggregates", ListAggregates).RequireAuthorization();
         api.MapGet("/incidents/{id}", GetIncident).RequireAuthorization();
         api.MapGet("/incidents", ListIncidents).RequireAuthorization();
         api.MapPost("/incidents/{id}/upvotes", Upvote).RequireAuthorization().RequireRateLimiting("writes");
@@ -219,12 +220,41 @@ public static class ApiEndpoints
             ],
         };
 
-        await store.InsertIncidentAsync(incident, cancellationToken);
-        logger.LogInformation(
-            "Incident {IncidentId} created in ward {WardCode} category {Category}",
-            incident.Id,
+        var nearest = await store.FindNearestOpenDuplicateAsync(
             incident.WardCode,
-            incident.Category);
+            incident.Category,
+            incident.Latitude,
+            incident.Longitude,
+            now.AddDays(-DuplicateWindow.MaxAgeDays),
+            cancellationToken);
+        if (nearest is not null)
+        {
+            var aggregateId = string.IsNullOrWhiteSpace(nearest.AggregateId) ? nearest.Id : nearest.AggregateId;
+            incident.AggregateId = aggregateId;
+            if (!string.Equals(nearest.AggregateId, aggregateId, StringComparison.Ordinal))
+            {
+                await store.SetAggregateIdAsync(nearest.Id, aggregateId, cancellationToken);
+            }
+        }
+
+        await store.InsertIncidentAsync(incident, cancellationToken);
+        if (incident.AggregateId is null)
+        {
+            logger.LogInformation(
+                "Incident {IncidentId} created in ward {WardCode} category {Category}",
+                incident.Id,
+                incident.WardCode,
+                incident.Category);
+        }
+        else
+        {
+            logger.LogInformation(
+                "Incident {IncidentId} merged into aggregate {AggregateId} in ward {WardCode} category {Category}",
+                incident.Id,
+                incident.AggregateId,
+                incident.WardCode,
+                incident.Category);
+        }
 
         return Results.Created($"/api/v1/incidents/{incident.Id}", new CreateIncidentResponse(
             incident.Id,
@@ -318,6 +348,38 @@ public static class ApiEndpoints
 
         return Results.File(path, "image/jpeg");
     }
+
+    private static async Task<IResult> ListAggregates(
+        string? wardCode,
+        HttpContext http,
+        IncidentStore store,
+        ILogger<IncidentStore> logger,
+        CancellationToken cancellationToken)
+    {
+        var user = await RequireUserAsync(http, store, cancellationToken);
+        if (user is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Sign in is required.");
+        }
+
+        var resolvedWard = string.IsNullOrWhiteSpace(wardCode) ? user.DefaultWardCode : wardCode.Trim();
+        if (string.IsNullOrWhiteSpace(resolvedWard) || !WardCatalog.IsKnown(resolvedWard))
+        {
+            return ApiErrors.Result(
+                http,
+                StatusCodes.Status400BadRequest,
+                "VALIDATION_ERROR",
+                "One or more fields are invalid.",
+                new Dictionary<string, string> { ["wardCode"] = "A hotspot list needs a demo ward such as JHB-23." });
+        }
+
+        var groups = await store.ListOpenAggregatesAsync(resolvedWard, cancellationToken);
+        logger.LogInformation("Ward aggregates loaded for {WardCode}. Groups {GroupCount}", resolvedWard, groups.Count);
+        return Results.Ok(new AggregateListResponse(groups.Select(ToAggregate).ToArray()));
+    }
+
+    private static AggregateSummary ToAggregate(WardAggregate group) =>
+        new(group.AggregateId, group.Category, group.WardCode, group.ReportCount, group.UpvoteCount, group.IncidentId);
 
     private static async Task<IResult> GetIncident(
         string id,
@@ -780,6 +842,16 @@ public sealed record CreateIncidentResponse(
     DateTime CreatedAt);
 
 public sealed record UpvoteResponse(int UpvoteCount, string? AggregateId);
+
+public sealed record AggregateListResponse(AggregateSummary[] Items);
+
+public sealed record AggregateSummary(
+    string AggregateId,
+    string Category,
+    string WardCode,
+    int ReportCount,
+    int UpvoteCount,
+    string IncidentId);
 
 public sealed record IncidentListResponse(IncidentSummary[] Items, string? NextCursor);
 

@@ -63,6 +63,14 @@ object IncidentClient {
         return IncidentCreateOutcome.Created(created.id)
     }
 
+    suspend fun listAggregates(accessToken: String, wardCode: String): List<AggregateBody> {
+        val response = api.aggregates(bearer(accessToken), wardCode)
+        if (!response.isSuccessful) {
+            throw incidentError(response)
+        }
+        return response.body()?.items.orEmpty()
+    }
+
     suspend fun listWard(accessToken: String, wardCode: String): List<IncidentSummaryBody> =
         list(accessToken, "ward", wardCode, null)
 
@@ -163,6 +171,12 @@ private interface IncidentApi {
         @Body body: CreateIncidentBody,
     ): Response<CreatedIncidentResponse>
 
+    @GET("api/v1/incidents/aggregates")
+    suspend fun aggregates(
+        @Header("Authorization") authorization: String,
+        @Query("wardCode") wardCode: String,
+    ): Response<AggregateListBody>
+
     @GET("api/v1/incidents")
     suspend fun list(
         @Header("Authorization") authorization: String,
@@ -208,6 +222,16 @@ data class CreatedIncidentResponse(val id: String = "")
 
 data class IncidentListBody(val items: List<IncidentSummaryBody> = emptyList())
 
+data class AggregateListBody(val items: List<AggregateBody> = emptyList())
+
+data class AggregateBody(
+    val aggregateId: String = "",
+    val category: String = "",
+    val reportCount: Int = 0,
+    val upvoteCount: Int = 0,
+    val incidentId: String = "",
+)
+
 data class IncidentSummaryBody(
     val id: String = "",
     val category: String = "",
@@ -232,6 +256,7 @@ data class IncidentDetailBody(
     val status: String = "",
     val upvoteCount: Int = 0,
     val viewerHasUpvoted: Boolean = false,
+    val aggregateId: String? = null,
     val photos: List<PhotoLinkBody>? = emptyList(),
     val timeline: List<TimelineEventBody>? = emptyList(),
     val createdAt: String = "",

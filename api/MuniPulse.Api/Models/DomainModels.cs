@@ -65,7 +65,7 @@ public sealed class IncidentReport
 
     public int UpvoteCount { get; set; }
 
-    // Set when near-duplicate combine runs. That behaviour is milestone M6.
+    // Shared by open reports in the same ward and category within 250 m and 14 days.
     public string? AggregateId { get; set; }
 
     public string? ClientMutationId { get; set; }

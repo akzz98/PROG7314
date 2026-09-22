@@ -271,6 +271,104 @@ public sealed class IncidentStore
         }
     }
 
+    public async Task<IncidentReport?> FindNearestOpenDuplicateAsync(
+        string wardCode,
+        string category,
+        double latitude,
+        double longitude,
+        DateTime createdSince,
+        CancellationToken cancellationToken)
+    {
+        var filter = Builders<IncidentReport>.Filter.And(
+            Builders<IncidentReport>.Filter.Eq(incident => incident.WardCode, wardCode),
+            Builders<IncidentReport>.Filter.Eq(incident => incident.Category, category),
+            Builders<IncidentReport>.Filter.In(
+                incident => incident.Status,
+                new[] { IncidentStatuses.Submitted, IncidentStatuses.InProgress }),
+            Builders<IncidentReport>.Filter.Gte(incident => incident.CreatedAt, createdSince));
+
+        try
+        {
+            var candidates = await Incidents()
+                .Find(filter)
+                .Limit(200)
+                .ToListAsync(cancellationToken);
+            IncidentReport? nearest = null;
+            var nearestMeters = double.MaxValue;
+            foreach (var candidate in candidates)
+            {
+                var meters = DuplicateWindow.MetersBetween(latitude, longitude, candidate.Latitude, candidate.Longitude);
+                if (meters <= DuplicateWindow.RadiusMeters && meters < nearestMeters)
+                {
+                    nearest = candidate;
+                    nearestMeters = meters;
+                }
+            }
+
+            return nearest;
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
+    }
+
+    public async Task SetAggregateIdAsync(string incidentId, string aggregateId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Incidents().UpdateOneAsync(
+                incident => incident.Id == incidentId,
+                Builders<IncidentReport>.Update
+                    .Set(incident => incident.AggregateId, aggregateId)
+                    .Set(incident => incident.UpdatedAt, DateTime.UtcNow),
+                cancellationToken: cancellationToken);
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
+    }
+
+    public async Task<IReadOnlyList<WardAggregate>> ListOpenAggregatesAsync(
+        string wardCode,
+        CancellationToken cancellationToken)
+    {
+        var filter = Builders<IncidentReport>.Filter.And(
+            Builders<IncidentReport>.Filter.Eq(incident => incident.WardCode, wardCode),
+            Builders<IncidentReport>.Filter.In(
+                incident => incident.Status,
+                new[] { IncidentStatuses.Submitted, IncidentStatuses.InProgress }));
+
+        try
+        {
+            var items = await Incidents().Find(filter).Limit(500).ToListAsync(cancellationToken);
+            return items
+                .GroupBy(incident => string.IsNullOrWhiteSpace(incident.AggregateId) ? incident.Id : incident.AggregateId)
+                .Select(group =>
+                {
+                    var lead = group
+                        .OrderByDescending(incident => incident.UpvoteCount)
+                        .ThenBy(incident => incident.Id, StringComparer.Ordinal)
+                        .First();
+                    return new WardAggregate(
+                        group.Key!,
+                        lead.Category,
+                        wardCode,
+                        group.Count(),
+                        group.Sum(incident => incident.UpvoteCount),
+                        lead.Id);
+                })
+                .OrderByDescending(aggregate => aggregate.UpvoteCount)
+                .ThenBy(aggregate => aggregate.Category, StringComparer.Ordinal)
+                .ToArray();
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
+    }
+
     public async Task<UpvoteResult> UpvoteAsync(string incidentId, string userId, CancellationToken cancellationToken)
     {
         if (!ObjectId.TryParse(incidentId, out _))
@@ -364,6 +462,14 @@ public sealed class IncidentStore
 }
 
 public sealed record IncidentPage(IReadOnlyList<IncidentReport> Items, string? NextCursor);
+
+public sealed record WardAggregate(
+    string AggregateId,
+    string Category,
+    string WardCode,
+    int ReportCount,
+    int UpvoteCount,
+    string IncidentId);
 
 public sealed record UpvoteResult(IncidentReport? Incident, bool MissingIncident, bool AlreadyUpvoted)
 {

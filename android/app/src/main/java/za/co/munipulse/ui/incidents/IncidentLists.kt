@@ -39,9 +39,26 @@ data class IncidentDetailItem(
     val status: String,
     val upvoteCount: Int,
     val viewerHasUpvoted: Boolean,
+    val grouped: Boolean = false,
     val upvoteNote: String = "",
     val photoIds: List<String>,
     val timeline: List<TimelineLine>,
+)
+
+sealed interface WardHotspotsUi {
+    data object Idle : WardHotspotsUi
+    data object Loading : WardHotspotsUi
+    data class Ready(val items: List<HotspotGroup>) : WardHotspotsUi
+    data class Failed(val message: String) : WardHotspotsUi
+}
+
+data class HotspotGroup(
+    val aggregateId: String,
+    val category: String,
+    val reportCount: Int,
+    val upvoteCount: Int,
+    val incidentId: String,
+    val rank: Int,
 )
 
 data class TimelineLine(
