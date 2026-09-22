@@ -776,7 +776,7 @@ public static class ApiEndpoints
             && header.Length > "Bearer ".Length;
     }
 
-    private static Dictionary<string, string> ValidateCreate(CreateIncidentRequest request)
+    internal static Dictionary<string, string> ValidateCreate(CreateIncidentRequest request)
     {
         var fields = new Dictionary<string, string>();
         if (!IncidentCategories.IsKnown(request.Category))
