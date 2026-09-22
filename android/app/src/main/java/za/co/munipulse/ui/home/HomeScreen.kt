@@ -21,9 +21,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,6 +47,9 @@ import androidx.compose.ui.unit.dp
 import za.co.munipulse.R
 import za.co.munipulse.auth.WardCatalog
 import za.co.munipulse.report.IncidentCategories
+import za.co.munipulse.ui.common.ListEmpty
+import za.co.munipulse.ui.common.ListError
+import za.co.munipulse.ui.common.ListLoading
 import za.co.munipulse.ui.incidents.MyIncidentsPane
 import za.co.munipulse.ui.incidents.MyIncidentsUi
 
@@ -71,6 +72,7 @@ fun HomeScreen(
     onRefreshMine: () -> Unit,
     onMineStatus: (String?) -> Unit,
     onOpenIncident: (String) -> Unit,
+    onOpenHotspots: () -> Unit,
     onOpenReport: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenProfile: () -> Unit,
@@ -136,6 +138,7 @@ fun HomeScreen(
                 onRefresh = onRefreshMine,
                 onStatus = onMineStatus,
                 onOpenIncident = onOpenIncident,
+                onOpenReport = onOpenReport,
             )
         } else {
             PulseBody(
@@ -149,6 +152,8 @@ fun HomeScreen(
                 pulse = pulse,
                 onRetry = { onRefresh(wardCode) },
                 onOpenIncident = onOpenIncident,
+                onOpenHotspots = onOpenHotspots,
+                onOpenReport = onOpenReport,
             )
         }
     }
@@ -166,6 +171,8 @@ private fun PulseBody(
     pulse: WardPulseUi,
     onRetry: () -> Unit,
     onOpenIncident: (String) -> Unit,
+    onOpenHotspots: () -> Unit,
+    onOpenReport: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -211,27 +218,21 @@ private fun PulseBody(
             text = stringResource(R.string.pulse_open, openCount(pulse)),
             style = MaterialTheme.typography.titleMedium,
         )
+        TextButton(onClick = onOpenHotspots) {
+            Text(text = stringResource(R.string.hotspots_open))
+        }
         Spacer(modifier = Modifier.height(8.dp))
         when (pulse) {
-            WardPulseUi.Idle, WardPulseUi.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            is WardPulseUi.Failed -> {
-                Text(
-                    text = pulse.message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = onRetry) {
-                    Text(text = stringResource(R.string.pulse_retry))
-                }
-            }
+            WardPulseUi.Idle, WardPulseUi.Loading -> ListLoading()
+            is WardPulseUi.Failed -> ListError(message = pulse.message, onRetry = onRetry)
             is WardPulseUi.Ready -> {
                 if (pulse.items.isEmpty()) {
-                    Text(text = stringResource(R.string.pulse_empty), style = MaterialTheme.typography.bodyLarge)
+                    ListEmpty(
+                        title = stringResource(R.string.pulse_empty),
+                        body = stringResource(R.string.list_empty_body),
+                        actionLabel = stringResource(R.string.home_report),
+                        onAction = onOpenReport,
+                    )
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(pulse.items, key = { it.id }) { item ->

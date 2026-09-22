@@ -22,6 +22,14 @@
     <string name="pulse_empty">No open incidents in this ward.</string>
     <string name="pulse_failed">The ward list did not load.</string>
     <string name="pulse_retry">Try again</string>
+    <string name="list_unreachable">Could not reach MuniPulse</string>
+    <string name="list_retry">Retry</string>
+    <string name="list_empty_body">Report the first fault in your street.</string>
+    <string name="hotspots_open">Ward hotspots</string>
+    <string name="hotspots_title">%1$s hotspots</string>
+    <string name="hotspots_note">Open reports in this ward, grouped by category. Combined hotspots are the next milestone.</string>
+    <string name="hotspots_row">%1$d. %2$s ↑%3$d</string>
+    <string name="hotspots_row_count">%1$d. %2$s · %3$d reports ↑%4$d</string>
     <string name="pulse_upvote">↑ %1$d</string>
     <string name="mine_title">My incidents</string>
     <string name="mine_filter">Filter: %1$s</string>

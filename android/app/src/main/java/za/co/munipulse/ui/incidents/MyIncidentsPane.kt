@@ -6,16 +6,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -27,11 +24,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import za.co.munipulse.R
+import za.co.munipulse.ui.common.ListEmpty
+import za.co.munipulse.ui.common.ListError
+import za.co.munipulse.ui.common.ListLoading
 import za.co.munipulse.ui.home.categoryName
 
 @Composable
@@ -42,6 +41,7 @@ fun MyIncidentsPane(
     onRefresh: () -> Unit,
     onStatus: (String?) -> Unit,
     onOpenIncident: (String) -> Unit,
+    onOpenReport: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -71,22 +71,20 @@ fun MyIncidentsPane(
             }
         }
         when (mine) {
-            MyIncidentsUi.Idle, MyIncidentsUi.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            is MyIncidentsUi.Failed -> {
-                Text(text = mine.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = onRefresh) {
-                    Text(text = stringResource(R.string.pulse_retry))
-                }
-            }
+            MyIncidentsUi.Idle, MyIncidentsUi.Loading -> ListLoading()
+            is MyIncidentsUi.Failed -> ListError(message = mine.message, onRetry = onRefresh)
             is MyIncidentsUi.Ready -> {
                 if (mine.items.isEmpty()) {
-                    val empty = if (status == null) R.string.mine_empty else R.string.mine_empty_filter
-                    Text(text = stringResource(empty), style = MaterialTheme.typography.bodyLarge)
+                    if (status == null) {
+                        ListEmpty(
+                            title = stringResource(R.string.mine_empty),
+                            body = stringResource(R.string.list_empty_body),
+                            actionLabel = stringResource(R.string.home_report),
+                            onAction = onOpenReport,
+                        )
+                    } else {
+                        ListEmpty(title = stringResource(R.string.mine_empty_filter))
+                    }
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(mine.items, key = { it.id }) { item ->

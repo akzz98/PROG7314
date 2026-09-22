@@ -15,6 +15,7 @@ import za.co.munipulse.auth.SignInUiState
 import za.co.munipulse.ui.home.HomeScreen
 import za.co.munipulse.ui.home.HomeTab
 import za.co.munipulse.ui.incidents.IncidentDetailScreen
+import za.co.munipulse.ui.incidents.WardHotspotsScreen
 import za.co.munipulse.ui.report.CreateIncidentScreen
 import za.co.munipulse.ui.login.LoginScreen
 import za.co.munipulse.ui.onboarding.OnboardingScreen
@@ -32,6 +33,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     var showReport by remember { mutableStateOf(false) }
     var homeTab by remember { mutableStateOf(HomeTab.Pulse) }
     var detailId by remember { mutableStateOf<String?>(null) }
+    var showHotspots by remember { mutableStateOf(false) }
     val state by viewModel.state.collectAsState()
     val restoring by viewModel.restoring.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
@@ -95,6 +97,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
                 showReport = false
                 homeTab = HomeTab.Pulse
                 detailId = null
+                showHotspots = false
                 viewModel.signOut()
             },
             onBack = { showSettings = false },
@@ -109,6 +112,14 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
                 viewModel.clearIncident()
             },
         )
+        current is SignInUiState.SignedIn && showHotspots -> WardHotspotsScreen(
+            wardCode = current.defaultWardCode,
+            pulse = wardPulse,
+            onRefresh = viewModel::refreshWardPulse,
+            onOpenIncident = { detailId = it },
+            onOpenReport = { showReport = true },
+            onBack = { showHotspots = false },
+        )
         current is SignInUiState.SignedIn -> HomeScreen(
             wardCode = current.defaultWardCode,
             pulse = wardPulse,
@@ -121,6 +132,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             onRefreshMine = viewModel::refreshMine,
             onMineStatus = viewModel::setMineStatus,
             onOpenIncident = { detailId = it },
+            onOpenHotspots = { showHotspots = true },
             onOpenReport = { showReport = true },
             onOpenNotifications = { showNotifications = true },
             onOpenProfile = { showProfile = true },

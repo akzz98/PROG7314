@@ -18,7 +18,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +38,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import za.co.munipulse.R
 import za.co.munipulse.report.PhotoFiles
+import za.co.munipulse.ui.common.ListError
+import za.co.munipulse.ui.common.ListLoading
 import za.co.munipulse.ui.home.categoryName
 
 @Composable
@@ -64,18 +65,8 @@ fun IncidentDetailScreen(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.detail_back))
         }
         when (detail) {
-            IncidentDetailUi.Idle, IncidentDetailUi.Loading -> {
-                Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            is IncidentDetailUi.Failed -> {
-                Text(text = detail.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = { onLoad(incidentId) }) {
-                    Text(text = stringResource(R.string.pulse_retry))
-                }
-            }
+            IncidentDetailUi.Idle, IncidentDetailUi.Loading -> ListLoading()
+            is IncidentDetailUi.Failed -> ListError(message = detail.message, onRetry = { onLoad(incidentId) })
             is IncidentDetailUi.Ready -> DetailBody(detail.item, onLoadPhoto)
         }
     }
