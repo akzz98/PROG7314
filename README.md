@@ -91,6 +91,8 @@ Open `android/` in Android Studio (AGP 9.4, Gradle 9.6, compile SDK 37). Studio 
 
 The default API address `http://10.0.2.2:5285/` is the emulator route to the API on your computer. A physical phone needs your PC's LAN address or an HTTPS tunnel.
 
+From `android/`, `.\gradlew.bat :app:testDebugUnitTest` runs the incident form validator tests. Those tests do not need Firebase, MongoDB, or a device.
+
 ### Google sign-in
 
 The login screen (S03) uses Firebase Authentication. The Google services plugin is `com.google.gms.google-services` 4.5.0. It is declared in `android/build.gradle.kts` and applied in `android/app/build.gradle.kts`. The Firebase BoM is 34.19.0.
