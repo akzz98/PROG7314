@@ -60,6 +60,8 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 | POST | `/api/v1/auth/session` | Firebase ID token in the body. The API checks it against Google's securetoken certificates, then returns an API JWT. |
 | GET, PATCH | `/api/v1/me` | Bearer API JWT |
 | POST, GET | `/api/v1/incidents` and `/api/v1/incidents/{id}` | Bearer API JWT |
+| POST | `/api/v1/incidents/photos` | Bearer API JWT. Multipart JPEG files, 1 to 3, each under 5 MB. Saved under `App_Data/incident-photos` on the API machine. |
+| GET | `/api/v1/incidents/photos/{id}` | Bearer API JWT. Returns that JPEG when it is still on disk. |
 | POST | `/api/v1/incidents/{id}/upvotes` | Bearer API JWT. One vote per user. |
 | POST | `/api/v1/incidents/{id}/milestones` | FieldWorker role, or header `X-Demo-Api-Key` |
 
@@ -67,7 +69,7 @@ Demo wards seeded into MongoDB: `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, `TSH-04`
 
 Until M2, a Development host with `Auth:AllowDevBypass` set to true accepts `firebaseIdToken` values `dev-citizen` and `dev-field-worker` and returns an API JWT. Those aliases are refused in any other environment.
 
-Milestone calls from a marker can send `X-Demo-Api-Key` with the value stored in user-secrets. A citizen JWT receives `403`. Near-duplicate ward aggregation is M6, so `aggregateId` stays null for now. Photo `url` stays null until multipart upload in M4.
+Milestone calls from a marker can send `X-Demo-Api-Key` with the value stored in user-secrets. A citizen JWT receives `403`. Near-duplicate ward aggregation is M6, so `aggregateId` stays null for now. A stored photo's `url` is `/api/v1/incidents/photos/{id}`. Azure Blob is Final POE. Sending the same `clientMutationId` again returns `409 DUPLICATE_MUTATION` and does not create a second incident.
 
 Sample calls are in `api/MuniPulse.Api/MuniPulse.Api.http`.
 
@@ -106,7 +108,7 @@ Settings includes a POPIA-style privacy note: name, email, ward, location, and p
 
 Settings opens Profile. That screen shows the name, masked email, default ward, language, and role. Impact score and badges are marked **Coming in Final POE** and are not shown.
 
-Home opens **New incident**. The form has a category (pothole, water leak, illegal dumping, streetlight, sewage, or other), a description, up to three photo previews from the camera or gallery, and a GPS line with **Refresh GPS**. Denying camera, gallery, or location stays on the screen and does not close the app. **Submit report** checks the category, a description of 10 to 1000 characters, a latitude and longitude, accuracy when a fix has one, the default ward, and a maximum of three photos. Invalid input stays on the screen. A valid form is still not sent. Logcat records permission results and the accuracy in metres. It does not record the coordinates, the description, or a token.
+Home opens **New incident**. The form has a category (pothole, water leak, illegal dumping, streetlight, sewage, or other), a description, up to three photo previews from the camera or gallery, and a GPS line with **Refresh GPS**. Denying camera, gallery, or location stays on the screen and does not close the app. **Submit report** checks the category, a description of 10 to 1000 characters, a latitude and longitude, accuracy when a fix has one, the default ward, and a maximum of three photos. Invalid input stays on the screen. A valid form uploads the photos as JPEG multipart, then `POST /api/v1/incidents` with a stable `clientMutationId`. A retry of that same form returns the already-submitted message instead of a second row. Logcat records permission results, create success or failure, and the accuracy in metres. It does not record the coordinates, the description, or a token.
 
 Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
 

@@ -28,12 +28,37 @@ object PhotoFiles {
         }
     }
 
-    fun thumbnail(context: Context, uri: Uri): Bitmap? {
+    fun thumbnail(context: Context, uri: Uri): Bitmap? = decode(context, uri, THUMB_PX, "Photo preview failed")
+
+    fun jpegBytes(context: Context, uri: Uri): ByteArray? {
+        val bitmap = decode(context, uri, UPLOAD_PX, "Photo prepare failed") ?: return null
+        return try {
+            val out = java.io.ByteArrayOutputStream()
+            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)) {
+                Log.e(TAG, "Photo prepare failed: compress")
+                return null
+            }
+            val bytes = out.toByteArray()
+            if (bytes.size > MAX_JPEG_BYTES) {
+                Log.e(TAG, "Photo was too large to send")
+                null
+            } else {
+                bytes
+            }
+        } catch (error: Exception) {
+            Log.e(TAG, "Photo prepare failed: ${error.javaClass.simpleName}")
+            null
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    private fun decode(context: Context, uri: Uri, targetPx: Int, failure: String): Bitmap? {
         return try {
             context.contentResolver.openInputStream(uri)?.use { stream ->
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeStream(stream, null, bounds)
-                val sample = sampleSize(bounds.outWidth, bounds.outHeight)
+                val sample = sampleSize(bounds.outWidth, bounds.outHeight, targetPx)
                 context.contentResolver.openInputStream(uri)?.use { decoded ->
                     BitmapFactory.decodeStream(
                         decoded,
@@ -43,19 +68,23 @@ object PhotoFiles {
                 }
             }
         } catch (error: Exception) {
-            Log.e(TAG, "Photo preview failed: ${error.javaClass.simpleName}")
+            Log.e(TAG, "$failure: ${error.javaClass.simpleName}")
             null
         }
     }
 
-    private fun sampleSize(width: Int, height: Int): Int {
+    private fun sampleSize(width: Int, height: Int, targetPx: Int): Int {
         var sample = 1
-        while (width / sample > TARGET_PX || height / sample > TARGET_PX) {
+        val safeWidth = width.coerceAtLeast(1)
+        val safeHeight = height.coerceAtLeast(1)
+        while (safeWidth / sample > targetPx || safeHeight / sample > targetPx) {
             sample *= 2
         }
         return sample.coerceAtLeast(1)
     }
 
     private const val TAG = "MuniPulse"
-    private const val TARGET_PX = 480
+    private const val THUMB_PX = 480
+    private const val UPLOAD_PX = 1600
+    private const val MAX_JPEG_BYTES = 5_000_000
 }

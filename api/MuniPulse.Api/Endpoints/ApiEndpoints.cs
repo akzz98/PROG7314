@@ -16,6 +16,8 @@ public static class ApiEndpoints
         api.MapGet("/me", GetMe).RequireAuthorization();
         api.MapPatch("/me", PatchMe).RequireAuthorization();
         api.MapPost("/incidents", CreateIncident).RequireAuthorization().RequireRateLimiting("writes");
+        api.MapPost("/incidents/photos", UploadPhotos).RequireAuthorization().RequireRateLimiting("writes").DisableAntiforgery();
+        api.MapGet("/incidents/photos/{id}", GetPhoto).RequireAuthorization();
         api.MapGet("/incidents/{id}", GetIncident).RequireAuthorization();
         api.MapGet("/incidents", ListIncidents).RequireAuthorization();
         api.MapPost("/incidents/{id}/upvotes", Upvote).RequireAuthorization().RequireRateLimiting("writes");
@@ -232,10 +234,96 @@ public static class ApiEndpoints
             incident.CreatedAt));
     }
 
+    private static async Task<IResult> UploadPhotos(
+        HttpRequest request,
+        HttpContext http,
+        PhotoStore photos,
+        IncidentStore store,
+        CancellationToken cancellationToken)
+    {
+        var user = await RequireUserAsync(http, store, cancellationToken);
+        if (user is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Sign in is required.");
+        }
+
+        if (!request.HasFormContentType)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status400BadRequest, "VALIDATION_ERROR", "Send the photos as multipart form data.");
+        }
+
+        var form = await request.ReadFormAsync(cancellationToken);
+        if (form.Files.Count is < 1 or > 3)
+        {
+            return ApiErrors.Result(
+                http,
+                StatusCodes.Status400BadRequest,
+                "VALIDATION_ERROR",
+                "Attach 1 to 3 photos.",
+                new Dictionary<string, string> { ["photoIds"] = "Attach 1 to 3 photos." });
+        }
+
+        var accepted = new List<byte[]>(form.Files.Count);
+        foreach (var file in form.Files)
+        {
+            if (file.Length is <= 0 or > PhotoStore.MaxBytes)
+            {
+                return ApiErrors.Result(
+                    http,
+                    StatusCodes.Status400BadRequest,
+                    "VALIDATION_ERROR",
+                    "Each photo must be a JPEG under 5 MB.",
+                    new Dictionary<string, string> { ["photoIds"] = "Each photo must be a JPEG under 5 MB." });
+            }
+
+            await using var stream = file.OpenReadStream();
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer, cancellationToken);
+            var bytes = buffer.ToArray();
+            if (!PhotoStore.IsJpeg(bytes))
+            {
+                return ApiErrors.Result(
+                    http,
+                    StatusCodes.Status400BadRequest,
+                    "VALIDATION_ERROR",
+                    "Each photo must be a JPEG under 5 MB.",
+                    new Dictionary<string, string> { ["photoIds"] = "Each photo must be a JPEG under 5 MB." });
+            }
+
+            accepted.Add(bytes);
+        }
+
+        var ids = await photos.SaveJpegsAsync(accepted, cancellationToken);
+        return Results.Ok(new PhotoUploadResponse(ids.ToArray()));
+    }
+
+    private static async Task<IResult> GetPhoto(
+        string id,
+        HttpContext http,
+        PhotoStore photos,
+        IncidentStore store,
+        CancellationToken cancellationToken)
+    {
+        var user = await RequireUserAsync(http, store, cancellationToken);
+        if (user is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Sign in is required.");
+        }
+
+        var path = photos.FileFor(id);
+        if (path is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status404NotFound, "NOT_FOUND", "That photo was not found.");
+        }
+
+        return Results.File(path, "image/jpeg");
+    }
+
     private static async Task<IResult> GetIncident(
         string id,
         HttpContext http,
         IncidentStore store,
+        PhotoStore photos,
         CancellationToken cancellationToken)
     {
         var user = await RequireUserAsync(http, store, cancellationToken);
@@ -250,7 +338,7 @@ public static class ApiEndpoints
             return ApiErrors.Result(http, StatusCodes.Status404NotFound, "NOT_FOUND", "That incident does not exist.");
         }
 
-        return Results.Ok(ToDetail(incident, user.Id));
+        return Results.Ok(ToDetail(incident, user.Id, photos));
     }
 
     private static async Task<IResult> ListIncidents(
@@ -596,7 +684,7 @@ public static class ApiEndpoints
             incident.CreatedAt,
             incident.UpvotedBy.Contains(viewerId));
 
-    private static IncidentDetail ToDetail(IncidentReport incident, string viewerId) =>
+    private static IncidentDetail ToDetail(IncidentReport incident, string viewerId, PhotoStore photos) =>
         new(
             incident.Id,
             incident.Category,
@@ -609,7 +697,9 @@ public static class ApiEndpoints
             incident.UpvoteCount,
             incident.AggregateId,
             incident.UpvotedBy.Contains(viewerId),
-            incident.PhotoIds.Select(photo => new PhotoLink(photo, null)).ToArray(),
+            incident.PhotoIds.Select(photo => new PhotoLink(
+                photo,
+                photos.FileFor(photo) is null ? null : $"/api/v1/incidents/photos/{photo}")).ToArray(),
             incident.Timeline
                 .OrderBy(entry => entry.At)
                 .Select(ToTimeline)
@@ -679,6 +769,8 @@ public sealed record UserResponse(
     NotificationResponse Notifications);
 
 public sealed record NotificationResponse(bool TicketStatus, bool AreaEmergencies);
+
+public sealed record PhotoUploadResponse(string[] PhotoIds);
 
 public sealed record CreateIncidentResponse(
     string Id,

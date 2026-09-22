@@ -15,6 +15,11 @@ builder.Services.Configure<JsonOptions>(options =>
     options.SerializerOptions.PropertyNameCaseInsensitive = true;
 });
 builder.Services.AddSingleton<IncidentStore>();
+builder.Services.AddSingleton<PhotoStore>();
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = PhotoStore.MaxBytes * 3L;
+});
 builder.AddApiAuth();
 builder.Services.AddRateLimiter(options =>
 {

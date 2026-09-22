@@ -2,6 +2,7 @@ package za.co.munipulse.auth
 
 import android.app.Activity
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.AndroidViewModel
@@ -15,6 +16,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import za.co.munipulse.R
+import za.co.munipulse.report.IncidentDraft
+import za.co.munipulse.report.IncidentSubmitResult
+import za.co.munipulse.report.IncidentValidator
+import za.co.munipulse.report.PhotoFiles
 
 sealed interface SignInUiState {
     data object Checking : SignInUiState
@@ -285,6 +290,74 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         notificationStore.save(merged)
         _notifications.value = merged
     }
+
+    suspend fun submitIncident(
+        draft: IncidentDraft,
+        photos: List<Uri>,
+        clientMutationId: String,
+    ): IncidentSubmitResult {
+        val token = accessToken
+        if (token.isNullOrBlank()) {
+            Log.w(TAG, "Incident create skipped. No API session")
+            return failed(R.string.report_auth)
+        }
+        val mutationId = clientMutationId.trim()
+        if (mutationId.length !in 1..80) {
+            Log.w(TAG, "Incident create skipped. Mutation id was rejected")
+            return failed(R.string.report_send_failed)
+        }
+        val errors = IncidentValidator.validate(draft)
+        val latitude = draft.latitude
+        val longitude = draft.longitude
+        if (errors.isNotEmpty() || photos.size != draft.photoCount || latitude == null || longitude == null) {
+            Log.i(TAG, "Create form rejected. Fields ${errors.keys.joinToString(",")}")
+            return failed(R.string.validation_summary)
+        }
+        val jpeg = mutableListOf<ByteArray>()
+        for (uri in photos) {
+            val bytes = PhotoFiles.jpegBytes(getApplication(), uri) ?: return failed(R.string.report_photo_failed)
+            jpeg += bytes
+        }
+        return try {
+            val photoIds = if (jpeg.isEmpty()) {
+                emptyList()
+            } else {
+                IncidentClient.uploadPhotos(token, jpeg)
+            }
+            Log.i(TAG, "Uploaded ${photoIds.size} incident photos")
+            when (
+                val outcome = IncidentClient.create(
+                    token,
+                    CreateIncidentBody(
+                        category = draft.category,
+                        description = draft.description.trim(),
+                        latitude = latitude,
+                        longitude = longitude,
+                        accuracyMeters = draft.accuracyMeters,
+                        wardCode = draft.wardCode,
+                        photoIds = photoIds,
+                        clientMutationId = mutationId,
+                    ),
+                )
+            ) {
+                is IncidentCreateOutcome.Created -> {
+                    Log.i(TAG, "Incident created ${outcome.incidentId}")
+                    IncidentSubmitResult.Created(outcome.incidentId)
+                }
+                IncidentCreateOutcome.Duplicate -> {
+                    Log.i(TAG, "Incident create duplicate")
+                    IncidentSubmitResult.AlreadySubmitted
+                }
+            }
+        } catch (error: Exception) {
+            val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
+            Log.e(TAG, "Incident create failed: $reason")
+            failed(R.string.report_send_failed)
+        }
+    }
+
+    private fun failed(message: Int): IncidentSubmitResult.Failed =
+        IncidentSubmitResult.Failed(getApplication<Application>().getString(message))
 
     private fun signedIn(
         displayName: String?,

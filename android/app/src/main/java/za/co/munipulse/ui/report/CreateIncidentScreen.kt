@@ -46,6 +46,7 @@ import kotlinx.coroutines.withContext
 import za.co.munipulse.R
 import za.co.munipulse.report.IncidentCategories
 import za.co.munipulse.report.IncidentDraft
+import za.co.munipulse.report.IncidentSubmitResult
 import za.co.munipulse.report.IncidentValidator
 import za.co.munipulse.report.LocationCapture
 import za.co.munipulse.report.LocationFix
@@ -55,6 +56,7 @@ import za.co.munipulse.report.PhotoFiles
 @Composable
 fun CreateIncidentScreen(
     wardCode: String,
+    onSubmit: suspend (IncidentDraft, List<Uri>, String) -> IncidentSubmitResult,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -69,6 +71,10 @@ fun CreateIncidentScreen(
     var pendingCapture by remember { mutableStateOf<Uri?>(null) }
     var pendingTake by remember { mutableStateOf(false) }
     var formAccepted by remember { mutableStateOf(false) }
+    var submitting by remember { mutableStateOf(false) }
+    var submitNote by remember { mutableStateOf<String?>(null) }
+    var submitFailed by remember { mutableStateOf(false) }
+    val mutationId = remember { java.util.UUID.randomUUID().toString() }
     var fieldErrors by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var access by remember { mutableStateOf(MediaPermissions.current(context)) }
     var asked by remember { mutableStateOf(false) }
@@ -332,28 +338,60 @@ fun CreateIncidentScreen(
         Spacer(modifier = Modifier.height(8.dp))
         Button(
             onClick = {
-                val errors = IncidentValidator.validate(
-                    IncidentDraft(
-                        category = category,
-                        description = description,
-                        latitude = fix?.latitude,
-                        longitude = fix?.longitude,
-                        accuracyMeters = fix?.accuracyMeters,
-                        wardCode = wardCode,
-                        photoCount = photos.size,
-                    ),
+                if (submitting) {
+                    return@Button
+                }
+                val draft = IncidentDraft(
+                    category = category,
+                    description = description,
+                    latitude = fix?.latitude,
+                    longitude = fix?.longitude,
+                    accuracyMeters = fix?.accuracyMeters,
+                    wardCode = wardCode,
+                    photoCount = photos.size,
                 )
+                val errors = IncidentValidator.validate(draft)
                 fieldErrors = errors
-                formAccepted = errors.isEmpty()
-                if (errors.isEmpty()) {
-                    Log.i(TAG, "Create form accepted. Report was not sent")
-                } else {
+                formAccepted = false
+                submitNote = null
+                submitFailed = false
+                if (errors.isNotEmpty()) {
                     Log.i(TAG, "Create form rejected. Fields ${errors.keys.joinToString(",")}")
+                    return@Button
+                }
+                submitting = true
+                val photoUris = photos
+                scope.launch {
+                    val result = try {
+                        onSubmit(draft, photoUris, mutationId)
+                    } catch (error: Exception) {
+                        Log.e(TAG, "Incident create failed: ${error.javaClass.simpleName}")
+                        IncidentSubmitResult.Failed(context.getString(R.string.report_send_failed))
+                    }
+                    submitting = false
+                    when (result) {
+                        is IncidentSubmitResult.Created -> {
+                            formAccepted = true
+                            submitFailed = false
+                            submitNote = context.getString(R.string.report_saved, result.incidentId)
+                        }
+                        IncidentSubmitResult.AlreadySubmitted -> {
+                            formAccepted = true
+                            submitFailed = false
+                            submitNote = context.getString(R.string.report_duplicate)
+                        }
+                        is IncidentSubmitResult.Failed -> {
+                            formAccepted = false
+                            submitFailed = true
+                            submitNote = result.message
+                        }
+                    }
                 }
             },
+            enabled = !submitting,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(text = stringResource(R.string.report_submit))
+            Text(text = stringResource(if (submitting) R.string.report_sending else R.string.report_submit))
         }
         if (fieldErrors.isNotEmpty()) {
             Text(
@@ -362,8 +400,13 @@ fun CreateIncidentScreen(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        if (formAccepted) {
-            Text(text = stringResource(R.string.report_valid), style = MaterialTheme.typography.bodyMedium)
+        val note = submitNote
+        if (note != null) {
+            Text(
+                text = note,
+                color = if (submitFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
     }
 }

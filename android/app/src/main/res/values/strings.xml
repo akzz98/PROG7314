@@ -39,6 +39,12 @@
     <string name="report_submit">Submit report</string>
     <string name="report_not_sent">This report is not sent yet.</string>
     <string name="report_valid">The form is valid. This report is not sent yet.</string>
+    <string name="report_sending">Sending report…</string>
+    <string name="report_saved">Report saved. %1$s</string>
+    <string name="report_duplicate">This report was already submitted.</string>
+    <string name="report_send_failed">The report was not sent. Try again.</string>
+    <string name="report_photo_failed">A photo could not be prepared.</string>
+    <string name="report_auth">Sign in again before sending.</string>
     <string name="validation_summary">Fix the fields above before sending.</string>
     <string name="validation_category">Choose a category such as Pothole.</string>
     <string name="validation_description">Use between 10 and 1000 characters.</string>
