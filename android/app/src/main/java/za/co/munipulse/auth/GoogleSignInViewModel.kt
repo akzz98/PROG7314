@@ -22,6 +22,11 @@ import za.co.munipulse.report.IncidentValidator
 import za.co.munipulse.report.PhotoFiles
 import za.co.munipulse.ui.home.WardPulseItem
 import za.co.munipulse.ui.home.WardPulseUi
+import za.co.munipulse.ui.incidents.IncidentDetailItem
+import za.co.munipulse.ui.incidents.IncidentDetailUi
+import za.co.munipulse.ui.incidents.MyIncidentItem
+import za.co.munipulse.ui.incidents.MyIncidentsUi
+import za.co.munipulse.ui.incidents.TimelineLine
 
 sealed interface SignInUiState {
     data object Checking : SignInUiState
@@ -63,6 +68,16 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private val _wardPulse = MutableStateFlow<WardPulseUi>(WardPulseUi.Idle)
     val wardPulse: StateFlow<WardPulseUi> = _wardPulse.asStateFlow()
     private var pulseGeneration = 0
+
+    private val _mineStatus = MutableStateFlow<String?>(null)
+    val mineStatus: StateFlow<String?> = _mineStatus.asStateFlow()
+    private val _mine = MutableStateFlow<MyIncidentsUi>(MyIncidentsUi.Idle)
+    val mine: StateFlow<MyIncidentsUi> = _mine.asStateFlow()
+    private var mineGeneration = 0
+
+    private val _detail = MutableStateFlow<IncidentDetailUi>(IncidentDetailUi.Idle)
+    val detail: StateFlow<IncidentDetailUi> = _detail.asStateFlow()
+    private var detailGeneration = 0
 
     fun updateNotifications(preferences: NotificationPreferences) {
         notificationStore.save(preferences)
@@ -202,9 +217,136 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    fun setMineStatus(status: String?) {
+        val next = when (status) {
+            null, "Submitted", "InProgress", "Resolved" -> status
+            else -> {
+                Log.w(TAG, "Ignored unknown incident status filter")
+                return
+            }
+        }
+        if (_mineStatus.value == next) {
+            return
+        }
+        _mineStatus.value = next
+        refreshMine()
+    }
+
+    fun refreshMine() {
+        val generation = ++mineGeneration
+        val status = _mineStatus.value
+        viewModelScope.launch {
+            _mine.value = MyIncidentsUi.Loading
+            val token = accessToken
+            if (token.isNullOrBlank()) {
+                Log.w(TAG, "My incidents skipped. No API session")
+                if (generation == mineGeneration) {
+                    _mine.value = MyIncidentsUi.Failed(getApplication<Application>().getString(R.string.report_auth))
+                }
+                return@launch
+            }
+            try {
+                val items = IncidentClient.listMine(token, status)
+                    .filter { it.id.isNotBlank() }
+                    .map { item ->
+                        MyIncidentItem(
+                            id = item.id,
+                            category = item.category,
+                            status = item.status,
+                            createdAt = item.createdAt,
+                        )
+                    }
+                if (generation != mineGeneration) {
+                    return@launch
+                }
+                Log.i(TAG, "My incidents loaded. Filter ${status ?: "All"}. Count ${items.size}")
+                _mine.value = MyIncidentsUi.Ready(items)
+            } catch (error: Exception) {
+                if (generation != mineGeneration) {
+                    return@launch
+                }
+                val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
+                Log.e(TAG, "My incidents failed: $reason")
+                _mine.value = MyIncidentsUi.Failed(getApplication<Application>().getString(R.string.mine_failed))
+            }
+        }
+    }
+
+    fun loadIncident(incidentId: String) {
+        val generation = ++detailGeneration
+        val id = incidentId.trim()
+        viewModelScope.launch {
+            _detail.value = IncidentDetailUi.Loading
+            val token = accessToken
+            if (token.isNullOrBlank() || id.isEmpty()) {
+                Log.w(TAG, "Incident detail skipped. No API session")
+                if (generation == detailGeneration) {
+                    _detail.value = IncidentDetailUi.Failed(getApplication<Application>().getString(R.string.detail_failed))
+                }
+                return@launch
+            }
+            try {
+                val body = IncidentClient.detail(token, id)
+                if (body.id.isBlank()) {
+                    throw IncidentRequestException("EMPTY", "The incident response was empty.")
+                }
+                val item = IncidentDetailItem(
+                    id = body.id,
+                    category = body.category,
+                    place = placeLabel(body.description),
+                    description = body.description.trim(),
+                    status = body.status,
+                    upvoteCount = body.upvoteCount,
+                    photoIds = body.photos.orEmpty()
+                        .filter { it.id.isNotBlank() && !it.url.isNullOrBlank() }
+                        .map { it.id },
+                    timeline = body.timeline.orEmpty().map { event ->
+                        TimelineLine(at = event.at, type = event.type, note = event.note.trim())
+                    },
+                )
+                if (generation != detailGeneration) {
+                    return@launch
+                }
+                Log.i(TAG, "Incident detail loaded ${item.id}. Timeline ${item.timeline.size}")
+                _detail.value = IncidentDetailUi.Ready(item)
+            } catch (error: Exception) {
+                if (generation != detailGeneration) {
+                    return@launch
+                }
+                val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
+                Log.e(TAG, "Incident detail failed: $reason")
+                _detail.value = IncidentDetailUi.Failed(getApplication<Application>().getString(R.string.detail_failed))
+            }
+        }
+    }
+
+    fun clearIncident() {
+        detailGeneration++
+        _detail.value = IncidentDetailUi.Idle
+    }
+
+    suspend fun loadPhotoJpeg(photoId: String): ByteArray? {
+        val token = accessToken
+        if (token.isNullOrBlank()) {
+            Log.w(TAG, "Incident photo skipped. No API session")
+            return null
+        }
+        return try {
+            IncidentClient.photoJpeg(token, photoId)
+        } catch (error: Exception) {
+            Log.e(TAG, "Incident photo failed: ${error.javaClass.simpleName}")
+            null
+        }
+    }
+
     fun signOut() {
         pulseGeneration++
+        mineGeneration++
+        detailGeneration++
         _wardPulse.value = WardPulseUi.Idle
+        _mine.value = MyIncidentsUi.Idle
+        _mineStatus.value = null
+        _detail.value = IncidentDetailUi.Idle
         accessToken = null
         sessionStore.clear()
         notificationStore.setPendingSync(false)

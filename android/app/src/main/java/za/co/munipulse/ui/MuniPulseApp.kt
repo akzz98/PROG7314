@@ -13,6 +13,8 @@ import kotlinx.coroutines.delay
 import za.co.munipulse.auth.GoogleSignInViewModel
 import za.co.munipulse.auth.SignInUiState
 import za.co.munipulse.ui.home.HomeScreen
+import za.co.munipulse.ui.home.HomeTab
+import za.co.munipulse.ui.incidents.IncidentDetailScreen
 import za.co.munipulse.ui.report.CreateIncidentScreen
 import za.co.munipulse.ui.login.LoginScreen
 import za.co.munipulse.ui.onboarding.OnboardingScreen
@@ -28,11 +30,16 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     var showNotifications by remember { mutableStateOf(false) }
     var showProfile by remember { mutableStateOf(false) }
     var showReport by remember { mutableStateOf(false) }
+    var homeTab by remember { mutableStateOf(HomeTab.Pulse) }
+    var detailId by remember { mutableStateOf<String?>(null) }
     val state by viewModel.state.collectAsState()
     val restoring by viewModel.restoring.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
     val onboardingDone by viewModel.onboardingComplete.collectAsState()
     val wardPulse by viewModel.wardPulse.collectAsState()
+    val mine by viewModel.mine.collectAsState()
+    val mineStatus by viewModel.mineStatus.collectAsState()
+    val detail by viewModel.detail.collectAsState()
     val showSplash = splashHold || state is SignInUiState.Checking || restoring
 
     LaunchedEffect(Unit) {
@@ -86,15 +93,34 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
                 showNotifications = false
                 showProfile = false
                 showReport = false
+                homeTab = HomeTab.Pulse
+                detailId = null
                 viewModel.signOut()
             },
             onBack = { showSettings = false },
+        )
+        current is SignInUiState.SignedIn && detailId != null -> IncidentDetailScreen(
+            incidentId = detailId.orEmpty(),
+            detail = detail,
+            onLoad = viewModel::loadIncident,
+            onLoadPhoto = viewModel::loadPhotoJpeg,
+            onBack = {
+                detailId = null
+                viewModel.clearIncident()
+            },
         )
         current is SignInUiState.SignedIn -> HomeScreen(
             wardCode = current.defaultWardCode,
             pulse = wardPulse,
             onRefresh = viewModel::refreshWardPulse,
             onWardSelected = viewModel::updateDefaultWard,
+            tab = homeTab,
+            onTab = { homeTab = it },
+            mine = mine,
+            mineStatus = mineStatus,
+            onRefreshMine = viewModel::refreshMine,
+            onMineStatus = viewModel::setMineStatus,
+            onOpenIncident = { detailId = it },
             onOpenReport = { showReport = true },
             onOpenNotifications = { showNotifications = true },
             onOpenProfile = { showProfile = true },

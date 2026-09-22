@@ -30,6 +30,23 @@ object PhotoFiles {
 
     fun thumbnail(context: Context, uri: Uri): Bitmap? = decode(context, uri, THUMB_PX, "Photo preview failed")
 
+    fun thumbnail(bytes: ByteArray): Bitmap? {
+        return try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            val sample = sampleSize(bounds.outWidth, bounds.outHeight, THUMB_PX)
+            BitmapFactory.decodeByteArray(
+                bytes,
+                0,
+                bytes.size,
+                BitmapFactory.Options().apply { inSampleSize = sample },
+            )
+        } catch (error: Exception) {
+            Log.e(TAG, "Photo preview failed: ${error.javaClass.simpleName}")
+            null
+        }
+    }
+
     fun jpegBytes(context: Context, uri: Uri): ByteArray? {
         val bitmap = decode(context, uri, UPLOAD_PX, "Photo prepare failed") ?: return null
         return try {

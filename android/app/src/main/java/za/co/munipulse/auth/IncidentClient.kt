@@ -13,6 +13,7 @@ import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
+import retrofit2.http.Path
 import retrofit2.http.Query
 import za.co.munipulse.BuildConfig
 
@@ -62,8 +63,43 @@ object IncidentClient {
         return IncidentCreateOutcome.Created(created.id)
     }
 
-    suspend fun listWard(accessToken: String, wardCode: String): List<IncidentSummaryBody> {
-        val response = api.list(bearer(accessToken), "ward", wardCode, WARD_PAGE)
+    suspend fun listWard(accessToken: String, wardCode: String): List<IncidentSummaryBody> =
+        list(accessToken, "ward", wardCode, null)
+
+    suspend fun listMine(accessToken: String, status: String?): List<IncidentSummaryBody> =
+        list(accessToken, "mine", null, status)
+
+    suspend fun detail(accessToken: String, incidentId: String): IncidentDetailBody {
+        val response = api.detail(bearer(accessToken), incidentId)
+        if (!response.isSuccessful) {
+            throw incidentError(response)
+        }
+        return response.body() ?: throw IncidentRequestException("EMPTY", "The incident response was empty.")
+    }
+
+    suspend fun photoJpeg(accessToken: String, photoId: String): ByteArray? {
+        if (!PHOTO_ID.matches(photoId)) {
+            return null
+        }
+        val response = api.photo(bearer(accessToken), photoId)
+        if (!response.isSuccessful) {
+            return null
+        }
+        val bytes = response.body()?.bytes() ?: return null
+        val jpeg = bytes.size in 3..MAX_JPEG &&
+            bytes[0] == 0xFF.toByte() &&
+            bytes[1] == 0xD8.toByte() &&
+            bytes[2] == 0xFF.toByte()
+        return if (jpeg) bytes else null
+    }
+
+    private suspend fun list(
+        accessToken: String,
+        scope: String,
+        wardCode: String?,
+        status: String?,
+    ): List<IncidentSummaryBody> {
+        val response = api.list(bearer(accessToken), scope, wardCode, status, PAGE)
         if (!response.isSuccessful) {
             throw incidentError(response)
         }
@@ -95,7 +131,9 @@ object IncidentClient {
         return body.substring(from, end)
     }
 
-    private const val WARD_PAGE = 50
+    private const val PAGE = 50
+    private const val MAX_JPEG = 5_000_000
+    private val PHOTO_ID = Regex("^[0-9a-fA-F]{32}$")
 }
 
 private interface IncidentApi {
@@ -116,9 +154,22 @@ private interface IncidentApi {
     suspend fun list(
         @Header("Authorization") authorization: String,
         @Query("scope") scope: String,
-        @Query("wardCode") wardCode: String,
+        @Query("wardCode") wardCode: String?,
+        @Query("status") status: String?,
         @Query("limit") limit: Int,
     ): Response<IncidentListBody>
+
+    @GET("api/v1/incidents/{id}")
+    suspend fun detail(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: String,
+    ): Response<IncidentDetailBody>
+
+    @GET("api/v1/incidents/photos/{id}")
+    suspend fun photo(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: String,
+    ): Response<okhttp3.ResponseBody>
 }
 
 data class PhotoUploadResponse(val photoIds: List<String> = emptyList())
@@ -144,6 +195,27 @@ data class IncidentSummaryBody(
     val description: String = "",
     val status: String = "",
     val upvoteCount: Int = 0,
+    val createdAt: String = "",
+)
+
+data class IncidentDetailBody(
+    val id: String = "",
+    val category: String = "",
+    val description: String = "",
+    val status: String = "",
+    val upvoteCount: Int = 0,
+    val photos: List<PhotoLinkBody>? = emptyList(),
+    val timeline: List<TimelineEventBody>? = emptyList(),
+    val createdAt: String = "",
+)
+
+data class PhotoLinkBody(val id: String = "", val url: String? = null)
+
+data class TimelineEventBody(
+    val at: String = "",
+    val type: String = "",
+    val note: String = "",
+    val actorRole: String = "",
 )
 
 sealed interface IncidentCreateOutcome {

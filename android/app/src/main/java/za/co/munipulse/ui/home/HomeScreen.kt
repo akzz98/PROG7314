@@ -1,6 +1,7 @@
 package za.co.munipulse.ui.home
 
 import android.util.Log
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,8 +49,10 @@ import androidx.compose.ui.unit.dp
 import za.co.munipulse.R
 import za.co.munipulse.auth.WardCatalog
 import za.co.munipulse.report.IncidentCategories
+import za.co.munipulse.ui.incidents.MyIncidentsPane
+import za.co.munipulse.ui.incidents.MyIncidentsUi
 
-private enum class HomeTab {
+enum class HomeTab {
     Pulse,
     Mine,
 }
@@ -61,13 +64,19 @@ fun HomeScreen(
     pulse: WardPulseUi,
     onRefresh: (String) -> Unit,
     onWardSelected: (String) -> Unit,
+    tab: HomeTab,
+    onTab: (HomeTab) -> Unit,
+    mine: MyIncidentsUi,
+    mineStatus: String?,
+    onRefreshMine: () -> Unit,
+    onMineStatus: (String?) -> Unit,
+    onOpenIncident: (String) -> Unit,
     onOpenReport: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var tab by remember { mutableStateOf(HomeTab.Pulse) }
     var wardMenu by remember { mutableStateOf(false) }
     val ward = WardCatalog.all.firstOrNull { it.code == wardCode }
 
@@ -92,13 +101,13 @@ fun HomeScreen(
             NavigationBar {
                 NavigationBarItem(
                     selected = tab == HomeTab.Pulse,
-                    onClick = { tab = HomeTab.Pulse },
+                    onClick = { onTab(HomeTab.Pulse) },
                     icon = { Icon(Icons.Filled.Home, contentDescription = null) },
                     label = { Text(text = stringResource(R.string.nav_home)) },
                 )
                 NavigationBarItem(
                     selected = tab == HomeTab.Mine,
-                    onClick = { tab = HomeTab.Mine },
+                    onClick = { onTab(HomeTab.Mine) },
                     icon = { Icon(Icons.Filled.Person, contentDescription = null) },
                     label = { Text(text = stringResource(R.string.nav_my)) },
                 )
@@ -120,7 +129,14 @@ fun HomeScreen(
         },
     ) { padding ->
         if (tab == HomeTab.Mine) {
-            MinePlaceholder(padding)
+            MyIncidentsPane(
+                padding = padding,
+                mine = mine,
+                status = mineStatus,
+                onRefresh = onRefreshMine,
+                onStatus = onMineStatus,
+                onOpenIncident = onOpenIncident,
+            )
         } else {
             PulseBody(
                 padding = padding,
@@ -132,6 +148,7 @@ fun HomeScreen(
                 onOpenProfile = onOpenProfile,
                 pulse = pulse,
                 onRetry = { onRefresh(wardCode) },
+                onOpenIncident = onOpenIncident,
             )
         }
     }
@@ -148,6 +165,7 @@ private fun PulseBody(
     onOpenProfile: () -> Unit,
     pulse: WardPulseUi,
     onRetry: () -> Unit,
+    onOpenIncident: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -217,7 +235,7 @@ private fun PulseBody(
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(pulse.items, key = { it.id }) { item ->
-                            PulseCard(item)
+                            PulseCard(item, onOpen = { onOpenIncident(item.id) })
                         }
                     }
                 }
@@ -227,10 +245,10 @@ private fun PulseBody(
 }
 
 @Composable
-private fun PulseCard(item: WardPulseItem) {
+private fun PulseCard(item: WardPulseItem, onOpen: () -> Unit) {
     val category = categoryName(item.category)
     val title = if (item.place.isBlank()) category else "$category · ${item.place}"
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -252,22 +270,7 @@ private fun PulseCard(item: WardPulseItem) {
 }
 
 @Composable
-private fun MinePlaceholder(padding: PaddingValues) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(text = stringResource(R.string.nav_my), style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(text = stringResource(R.string.my_list_next), style = MaterialTheme.typography.bodyLarge)
-    }
-}
-
-@Composable
-private fun categoryName(code: String): String {
+internal fun categoryName(code: String): String {
     val match = IncidentCategories.all.firstOrNull { it.code == code } ?: return code
     return stringResource(match.label)
 }
