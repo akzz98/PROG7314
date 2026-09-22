@@ -40,6 +40,7 @@ fun SettingsScreen(
     email: String,
     defaultWardCode: String,
     profileNote: String,
+    onOpenProfile: () -> Unit,
     onWardSelected: (String) -> Unit,
     onOpenNotifications: () -> Unit,
     onSignOut: () -> Unit,
@@ -71,6 +72,9 @@ fun SettingsScreen(
         Text(text = displayName, style = MaterialTheme.typography.bodyLarge)
         if (email.isNotEmpty()) {
             Text(text = maskEmail(email), style = MaterialTheme.typography.bodyLarge)
+        }
+        OutlinedButton(onClick = onOpenProfile, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(R.string.settings_profile))
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = stringResource(R.string.settings_ward), style = MaterialTheme.typography.titleMedium)

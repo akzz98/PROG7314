@@ -27,6 +27,8 @@ sealed interface SignInUiState {
         val sessionNote: String,
         val defaultWardCode: String,
         val profileNote: String = "",
+        val preferredLanguage: String = "en",
+        val role: String = "Citizen",
     ) : SignInUiState
     data object MissingConfig : SignInUiState
     data object MissingWebClient : SignInUiState
@@ -100,6 +102,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 stored.email.ifBlank { user.email },
                 context.getString(R.string.session_ready),
                 stored.defaultWardCode,
+                preferredLanguage = sessionStore.readLanguage() ?: "en",
             )
             requestProfileSync(pushLocal = false)
             return
@@ -171,6 +174,8 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
 
     private suspend fun sessionState(user: FirebaseUser): SignInUiState {
         var ward = WardCatalog.DEFAULT
+        var language = sessionStore.readLanguage() ?: "en"
+        var role = "Citizen"
         val note = try {
             val idToken = user.getIdToken(false).await().token
                 ?: throw SessionExchangeException("Firebase did not return an ID token.")
@@ -182,8 +187,13 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             val pending = notificationStore.isPendingSync()
             ward = if (pending) sessionStore.read()?.defaultWardCode ?: serverWard else serverWard
             sessionStore.save(session, name, email, ward)
+            role = session.user.roles?.firstOrNull { it.isNotBlank() } ?: "Citizen"
             if (!pending) {
-                session.user.preferredLanguage?.let(sessionStore::updateLanguage)
+                val serverLanguage = session.user.preferredLanguage
+                if (serverLanguage == "en" || serverLanguage == "zu") {
+                    sessionStore.updateLanguage(serverLanguage)
+                    language = serverLanguage
+                }
                 applyRemoteNotifications(session.user.notifications)
             }
             Log.i(TAG, "API session issued for user ${session.user.id}")
@@ -202,6 +212,8 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             user.email,
             note ?: getApplication<Application>().getString(R.string.session_failed),
             ward,
+            preferredLanguage = language,
+            role = role,
         )
     }
 
@@ -254,6 +266,9 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 email = profile.email?.takeIf { it.isNotBlank() } ?: current.email,
                 defaultWardCode = ward,
                 profileNote = "",
+                preferredLanguage = profile.preferredLanguage?.takeIf { it == "en" || it == "zu" }
+                    ?: current.preferredLanguage,
+                role = profile.roles?.firstOrNull { it.isNotBlank() } ?: current.role,
             )
         }
         Log.i(TAG, "Profile synced for user ${profile.id}")
@@ -276,12 +291,16 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         email: String?,
         sessionNote: String,
         defaultWardCode: String,
+        preferredLanguage: String = "en",
+        role: String = "Citizen",
     ): SignInUiState.SignedIn =
         SignInUiState.SignedIn(
             displayName = displayName?.takeIf { it.isNotBlank() } ?: "Google account",
             email = email?.takeIf { it.isNotBlank() } ?: "",
             sessionNote = sessionNote,
             defaultWardCode = WardCatalog.normalize(defaultWardCode),
+            preferredLanguage = if (preferredLanguage == "zu") "zu" else "en",
+            role = role.ifBlank { "Citizen" },
         )
 
     private companion object {

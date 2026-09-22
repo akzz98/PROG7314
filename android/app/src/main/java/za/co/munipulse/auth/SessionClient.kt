@@ -57,6 +57,7 @@ data class SessionUser(
     val email: String? = null,
     val defaultWardCode: String? = null,
     val preferredLanguage: String? = null,
+    val roles: List<String>? = null,
     val notifications: ApiNotifications? = null,
 )
 
