@@ -172,6 +172,10 @@ public static class AuthRegistration
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
+                // Local demo uses the http profile. The emulator calls http://10.0.2.2:5285/.
+                options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+                // Keep "sub" as issued. The handler otherwise renames it and profile lookup fails.
+                options.MapInboundClaims = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
