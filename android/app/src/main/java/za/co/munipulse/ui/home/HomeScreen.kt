@@ -118,8 +118,18 @@ fun HomeScreen(
                     selected = false,
                     onClick = {},
                     enabled = false,
-                    icon = { Icon(Icons.Filled.Place, contentDescription = null) },
-                    label = { Text(text = stringResource(R.string.nav_map)) },
+                    icon = {
+                        Icon(
+                            Icons.Filled.Place,
+                            contentDescription = stringResource(R.string.nav_map_description),
+                        )
+                    },
+                    label = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = stringResource(R.string.nav_map))
+                            Text(text = stringResource(R.string.nav_map_poe))
+                        }
+                    },
                 )
                 NavigationBarItem(
                     selected = false,
