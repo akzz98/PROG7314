@@ -1,7 +1,12 @@
 name: Android
 
+# Green with google-services.json.example. Do not add a Firebase, MongoDB, or JWT secret.
+
 on:
   push:
+
+permissions:
+  contents: read
 
 jobs:
   unit-test:

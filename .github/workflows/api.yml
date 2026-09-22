@@ -1,7 +1,13 @@
 name: API
 
+# Green with the committed empty MongoDB connection string and JWT signing key.
+# Do not add a Firebase, MongoDB, or JWT secret to this job.
+
 on:
   push:
+
+permissions:
+  contents: read
 
 jobs:
   build-and-test:

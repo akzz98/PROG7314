@@ -37,6 +37,8 @@ dotnet run --project api/MuniPulse.Api --launch-profile http
 
 `dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, the 250 metre duplicate window, the field-worker demo key comparison, and unauthenticated calls. They do not need Firebase, MongoDB, or a JWT signing key. `.github/workflows/api.yml` runs the same command on every push.
 
+Both GitHub Actions jobs go green from the committed files alone. The API job uses the empty MongoDB connection string and the empty JWT signing key in `appsettings.json`. The Android job copies `google-services.json.example` and does not call Firebase. Neither workflow defines a secret.
+
 Health check: [http://localhost:5285/health](http://localhost:5285/health)
 
 ```json
