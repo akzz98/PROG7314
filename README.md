@@ -57,7 +57,7 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 
 | Method | Path | Auth |
 | --- | --- | --- |
-| POST | `/api/v1/auth/session` | Firebase ID token in the body. Google certificate checks arrive in M2. |
+| POST | `/api/v1/auth/session` | Firebase ID token in the body. The API checks it against Google's securetoken certificates, then returns an API JWT. |
 | GET, PATCH | `/api/v1/me` | Bearer API JWT |
 | POST, GET | `/api/v1/incidents` and `/api/v1/incidents/{id}` | Bearer API JWT |
 | POST | `/api/v1/incidents/{id}/upvotes` | Bearer API JWT. One vote per user. |
@@ -87,7 +87,9 @@ The login screen (S03) uses Firebase Authentication. `android/app/google-service
 4. Download `google-services.json` again into `android/app/`, replacing the current file. Do not commit it. The file is only complete after the Web client appears under `oauth_client`.
 5. Rebuild and run on a device or emulator with Google Play. Tap **Continue with Google**.
 
-A successful sign-in stays inside Firebase for now. Exchanging that ID token for the API JWT is the next auth task. Sign-in logs record the Firebase uid only, never the ID token.
+After Google sign-in, the app sends the Firebase ID token to `POST /api/v1/auth/session` and keeps the API JWT in memory. Saving that session across restarts is the next auth task. Logs record the Firebase uid and the API user id, never either token.
+
+`Firebase:ProjectId` in `appsettings.json` must match the Firebase project (`munipulse-987ce`). The API still needs `Jwt:SigningKey` in user-secrets before it can issue a session.
 
 The SDK used for the scaffold compile is `%LOCALAPPDATA%\Android\Sdk` (platform 37). `android/local.properties` is generated locally and gitignored. `ANDROID_HOME` does not need to be set when that file contains `sdk.dir`.
 

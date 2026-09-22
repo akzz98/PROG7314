@@ -52,6 +52,8 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.google.id)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)

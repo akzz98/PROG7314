@@ -36,14 +36,14 @@ public static class ApiEndpoints
             return ApiErrors.Result(http, StatusCodes.Status400BadRequest, "MISSING_TOKEN", "Firebase ID token is required.");
         }
 
-        var identity = verifier.Verify(request.FirebaseIdToken);
+        var identity = await verifier.VerifyAsync(request.FirebaseIdToken, cancellationToken);
         if (identity is null)
         {
             return ApiErrors.Result(
                 http,
                 StatusCodes.Status401Unauthorized,
                 "INVALID_TOKEN",
-                "The Firebase ID token was rejected. Google verification is connected in M2.");
+                "The Firebase ID token was rejected.");
         }
 
         var user = await store.FindUserByFirebaseUidAsync(identity.FirebaseUid, cancellationToken);

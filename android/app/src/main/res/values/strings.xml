@@ -9,6 +9,7 @@
     <string name="login_cancelled">Sign-in was cancelled.</string>
     <string name="login_failed">Google sign-in did not finish. Try again.</string>
     <string name="signed_in_title">Signed in</string>
-    <string name="signed_in_next">The API session exchange is the next auth step.</string>
+    <string name="session_ready">API session is ready.</string>
+    <string name="session_failed">Google sign-in worked, but the API session did not. Check that the API is running.</string>
     <string name="sign_out">Sign out</string>
 </resources>

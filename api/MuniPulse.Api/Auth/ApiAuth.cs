@@ -33,15 +33,14 @@ public sealed class JwtSettings
 
 public sealed record VerifiedIdentity(string FirebaseUid, string Email, string DisplayName, string Role);
 
-// M2 replaces this with Firebase JWKS verification of the Google ID token.
-// Until then, Development can opt in to two fixed aliases. They are not secrets;
-// they do nothing unless Auth:AllowDevBypass is true and the host is Development.
 public interface IIdTokenVerifier
 {
-    VerifiedIdentity? Verify(string firebaseIdToken);
+    Task<VerifiedIdentity?> VerifyAsync(string firebaseIdToken, CancellationToken cancellationToken);
 }
 
-public sealed class DevBypassIdTokenVerifier : IIdTokenVerifier
+// Development-only aliases. They are not secrets, and they do nothing unless
+// Auth:AllowDevBypass is true and the host environment is Development.
+public sealed class DevBypassIdTokenVerifier
 {
     private readonly IHostEnvironment _environment;
     private readonly bool _allowDevBypass;
@@ -159,7 +158,10 @@ public static class AuthRegistration
         var settings = new JwtSettings(builder.Configuration);
         builder.Services.AddSingleton(settings);
         builder.Services.AddSingleton<ApiJwtIssuer>();
-        builder.Services.AddSingleton<IIdTokenVerifier, DevBypassIdTokenVerifier>();
+        builder.Services.AddHttpClient(FirebaseIdTokenVerifier.HttpClientName);
+        builder.Services.AddSingleton<DevBypassIdTokenVerifier>();
+        builder.Services.AddSingleton<FirebaseIdTokenVerifier>();
+        builder.Services.AddSingleton<IIdTokenVerifier, SessionIdTokenVerifier>();
 
         // When the real key is missing, tokens are checked against a random key so
         // nothing issued outside this process can authenticate. Issuance stays disabled.

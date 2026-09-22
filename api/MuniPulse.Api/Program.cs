@@ -117,7 +117,7 @@ app.MapGet("/health", () => Results.Ok(new HealthResponse("ok", "MuniPulse SA"))
 app.MapMuniPulseApi();
 
 var store = app.Services.GetRequiredService<IncidentStore>();
-var bypass = app.Services.GetRequiredService<IIdTokenVerifier>() as DevBypassIdTokenVerifier;
+var bypass = app.Services.GetRequiredService<DevBypassIdTokenVerifier>();
 var jwt = app.Services.GetRequiredService<JwtSettings>();
 app.Logger.LogInformation(
     "MuniPulse SA API starting. Mongo configured: {MongoConfigured}. Dev session bypass: {DevBypass}. JWT configured: {JwtConfigured}. Field worker key configured: {FieldWorkerKeyConfigured}",

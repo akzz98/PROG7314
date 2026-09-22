@@ -37,6 +37,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
         is SignInUiState.SignedIn -> SignedInScreen(
             displayName = current.displayName,
             email = current.email,
+            sessionNote = current.sessionNote,
             onSignOut = viewModel::signOut,
         )
         else -> LoginScreen(

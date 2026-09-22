@@ -76,6 +76,7 @@ fun LoginScreen(
 fun SignedInScreen(
     displayName: String,
     email: String,
+    sessionNote: String,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -93,7 +94,7 @@ fun SignedInScreen(
             Text(text = email, style = MaterialTheme.typography.bodyLarge)
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Text(text = stringResource(R.string.signed_in_next), style = MaterialTheme.typography.bodyMedium)
+        Text(text = sessionNote, style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.height(24.dp))
         Button(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
             Text(text = stringResource(R.string.sign_out))
