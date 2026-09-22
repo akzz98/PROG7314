@@ -69,6 +69,65 @@ Every push runs two workflows. Each job checks out the repository with read-only
 
 The API job uses the empty MongoDB connection string and the empty JWT signing key in `appsettings.json`. The Android job copies `google-services.json.example` into the gitignored Firebase file and does not call Firebase. GitHub-hosted runners do not include the Android SDK, so that job installs platform 37. It does not start an emulator. If platform 37 is missing from the SDK manager, the Android job cannot compile.
 
+## Setup
+
+Keep the Atlas connection string, the JWT signing key, the field-worker demo key, and `google-services.json` on your machine. The commands below use [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) for the API. You can use a gitignored `appsettings.Development.json` instead, copied from `api/MuniPulse.Api/appsettings.Development.json.example`.
+
+### MongoDB
+
+Create a MongoDB Atlas cluster and a database user. The API database name is `munipulse`.
+
+```powershell
+dotnet user-secrets set "MongoDb:ConnectionString" "<atlas-connection-string>" --project api/MuniPulse.Api
+```
+
+On startup the API creates indexes and seeds wards `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, and `TSH-04`, plus the user `demo-field-worker`. With an empty connection string, `/health` still returns ok and data routes return `503 DATABASE_UNAVAILABLE`.
+
+### JWT signing key
+
+Session issuance needs a key of at least 32 characters.
+
+```powershell
+dotnet user-secrets set "Jwt:SigningKey" "<at-least-32-random-characters>" --project api/MuniPulse.Api
+```
+
+`Firebase:ProjectId` in `appsettings.json` is `munipulse-987ce`. It must match the Firebase project that issued the Google ID token.
+
+### Firebase
+
+The Android package is `com.munipulse`. `android/app/google-services.json` is gitignored. Commit `android/app/google-services.json.example` only.
+
+1. Copy `android/app/google-services.json.example` to `android/app/google-services.json` if the downloaded file is not there yet.
+2. From `android/`, run `.\gradlew.bat :app:signingReport` and register the debug SHA-1 on the Firebase Android app.
+3. Enable the Google sign-in provider. That creates a Web client ID.
+4. Download `google-services.json` again into `android/app/`. The file is ready for sign-in when a Web client appears under `oauth_client`.
+5. Rebuild and run on a device or emulator with Google Play. Tap **Continue with Google**.
+
+### API URL
+
+The API http profile listens on `http://localhost:5285`. Health check: [http://localhost:5285/health](http://localhost:5285/health).
+
+The app reads `API_BASE_URL` from `android/local.properties` (gitignored). Start from `android/local.properties.example`.
+
+| Where the app runs | `API_BASE_URL` |
+| --- | --- |
+| Emulator | `http://10.0.2.2:5285/` (the default) |
+| Physical phone | Your PC's LAN address, or an HTTPS tunnel |
+
+Debug builds allow cleartext HTTP. A release build needs an `https://` URL.
+
+### Field-worker demo path
+
+There is no staff app. API startup seeds Firebase uid `demo-field-worker` with role `FieldWorker` once MongoDB is configured.
+
+```powershell
+dotnet user-secrets set "FieldWorker:DemoApiKey" "<long-random-demo-key>" --project api/MuniPulse.Api
+```
+
+Choose that value yourself and leave it out of git. Create an incident, copy its id, then send the milestone call in `api/MuniPulse.Api/MuniPulse.Api.http` with header `X-Demo-Api-Key`. Types are `Assigned`, `OnSite`, `Resolved`, and `Note`. A citizen API JWT on that route, without the header, receives `403 FORBIDDEN`. A missing token receives `401`.
+
+A Development host can also accept session aliases `dev-citizen` and `dev-field-worker` when `Auth:AllowDevBypass` is true. Copy the Development example to `appsettings.Development.json`. Those aliases are refused outside Development.
+
 ## Run the API
 
 Requires the .NET 10 SDK.
@@ -85,15 +144,7 @@ Health check: [http://localhost:5285/health](http://localhost:5285/health)
 { "status": "ok", "app": "MuniPulse SA" }
 ```
 
-MongoDB, the JWT signing key, and the field-worker demo key stay out of git. Put them in [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) or a gitignored `appsettings.Development.json` (start from `appsettings.Development.json.example`). The signing key must be at least 32 characters.
-
-```powershell
-dotnet user-secrets set "MongoDb:ConnectionString" "<atlas-connection-string>" --project api/MuniPulse.Api
-dotnet user-secrets set "Jwt:SigningKey" "<at-least-32-random-characters>" --project api/MuniPulse.Api
-dotnet user-secrets set "FieldWorker:DemoApiKey" "<long-random-demo-key>" --project api/MuniPulse.Api
-```
-
-Copy `api/MuniPulse.Api/appsettings.Development.json.example` to `appsettings.Development.json` if you want the local session aliases below. That file is gitignored. `Auth:AllowDevBypass` only works when the host environment is Development.
+Secrets and the phone's API address are set in [Setup](#setup).
 
 ### Domain API
 
@@ -113,17 +164,11 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 
 Demo wards seeded into MongoDB: `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, `TSH-04`. Categories: `Pothole`, `WaterLeak`, `IllegalDumping`, `Streetlight`, `Sewage`, `Other`.
 
-Until M2, a Development host with `Auth:AllowDevBypass` set to true accepts `firebaseIdToken` values `dev-citizen` and `dev-field-worker` and returns an API JWT. Those aliases are refused in any other environment.
+A Development host with `Auth:AllowDevBypass` set to true accepts `firebaseIdToken` values `dev-citizen` and `dev-field-worker` and returns an API JWT. Those aliases are refused in any other environment. See [Setup](#setup).
 
 ### Milestone without a staff app
 
-API startup seeds a MongoDB user with Firebase uid `demo-field-worker` and role `FieldWorker`. There is no staff app.
-
-1. Set `FieldWorker:DemoApiKey` with the user-secrets command above. Leave the value out of git.
-2. Create an incident and copy its id.
-3. Send the call in `api/MuniPulse.Api/MuniPulse.Api.http`, with `X-Demo-Api-Key` set to that secret. Types are `Assigned`, `OnSite`, `Resolved`, and `Note`.
-
-A citizen API JWT on that route, without the demo key, receives `403 FORBIDDEN`. The log records the user id. It does not record the token or the key. A missing token receives `401`.
+Follow [Field-worker demo path](#field-worker-demo-path). The log records the user id. It does not record the token or the key.
 
 A new report joins an open report in the same ward and category when it is within 250 metres and 14 days. Both then share an `aggregateId`. Otherwise `aggregateId` stays null. A stored photo's `url` is `/api/v1/incidents/photos/{id}`. Azure Blob is Final POE. Sending the same `clientMutationId` again returns `409 DUPLICATE_MUTATION` and does not create a second incident.
 
@@ -131,9 +176,7 @@ Sample calls are in `api/MuniPulse.Api/MuniPulse.Api.http`.
 
 ## Run the Android app
 
-Open `android/` in Android Studio (AGP 9.4, Gradle 9.6, compile SDK 37). Studio writes `sdk.dir` into `android/local.properties`. Copy `android/local.properties.example` if you need to set `API_BASE_URL` yourself.
-
-The default API address `http://10.0.2.2:5285/` is the emulator route to the API on your computer. A physical phone needs your PC's LAN address or an HTTPS tunnel.
+Open `android/` in Android Studio (AGP 9.4, Gradle 9.6, compile SDK 37). Studio writes `sdk.dir` into `android/local.properties`. Set `API_BASE_URL` as described in [API URL](#api-url).
 
 From `android/`, `.\gradlew.bat :app:testDebugUnitTest` runs the incident form validator tests. Those tests do not need Firebase, MongoDB, or a device. The Android workflow runs the same task on every push.
 
@@ -141,14 +184,7 @@ From `android/`, `.\gradlew.bat :app:testDebugUnitTest` runs the incident form v
 
 The login screen (S03) uses Firebase Authentication. The Google services plugin is `com.google.gms.google-services` 4.5.0. It is declared in `android/build.gradle.kts` and applied in `android/app/build.gradle.kts`. The Firebase BoM is 34.19.0.
 
-`android/app/google-services.json` is gitignored (`**/google-services.json` in the root `.gitignore`). Commit `android/app/google-services.json.example` only. That example uses package `com.munipulse` and placeholder values, with an empty `oauth_client`.
-
-1. Copy `android/app/google-services.json.example` to `android/app/google-services.json` if the real file is not there yet. Do not commit the copy.
-2. The Firebase Android app package is `com.munipulse`. That is the application id in `android/app/build.gradle.kts`.
-3. From `android/`, run `.\gradlew.bat :app:signingReport` and register the debug SHA-1 on that Firebase app.
-4. Enable the Google sign-in provider. That creates a Web client ID.
-5. Download `google-services.json` again into `android/app/`, replacing the local file. Do not commit it. The file is only complete after the Web client appears under `oauth_client`.
-6. Rebuild and run on a device or emulator with Google Play. Tap **Continue with Google**.
+Follow [Firebase](#firebase), then tap **Continue with Google**.
 
 After Google sign-in, the app sends the Firebase ID token to `POST /api/v1/auth/session`. The API JWT is stored in encrypted preferences and removed on sign-out. A later launch reuses it until it expires. Logs record the Firebase uid, the API user id, the HTTP method, path, status, and correlation id. They record an exception type when something fails. They do not record the Firebase ID token, the API JWT, the Authorization header, or a MongoDB connection string.
 
@@ -169,8 +205,6 @@ Settings opens Profile. That screen shows the name, masked email, default ward, 
 Home opens **New incident**. The form has a category (pothole, water leak, illegal dumping, streetlight, sewage, or other), a description, up to three photo previews from the camera or gallery, and a GPS line with **Refresh GPS**. Denying camera, gallery, or location stays on the screen and does not close the app. **Submit report** checks the category, a description of 10 to 1000 characters, a latitude and longitude, accuracy when a fix has one, the default ward, and a maximum of three photos. Invalid input stays on the screen. When a location is set, the form asks `GET /api/v1/incidents/nearby` and can expand **Nearby duplicates** with the category, a short place line, the upvote count, and the distance. A valid form uploads the photos as JPEG multipart, then `POST /api/v1/incidents` with a stable `clientMutationId`. A retry of that same form returns the already-submitted message instead of a second row. Logcat records permission results, create success or failure, and the accuracy in metres. It does not record the coordinates, the description, or a token.
 
 Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
-
-`Firebase:ProjectId` in `appsettings.json` must match the Firebase project (`munipulse-987ce`). The API still needs `Jwt:SigningKey` in user-secrets before it can issue a session.
 
 The SDK used for the scaffold compile is `%LOCALAPPDATA%\Android\Sdk` (platform 37). `android/local.properties` is generated locally and gitignored. `ANDROID_HOME` does not need to be set when that file contains `sdk.dir`.
 
