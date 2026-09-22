@@ -20,6 +20,8 @@ import za.co.munipulse.report.IncidentDraft
 import za.co.munipulse.report.IncidentSubmitResult
 import za.co.munipulse.report.IncidentValidator
 import za.co.munipulse.report.PhotoFiles
+import za.co.munipulse.ui.home.WardPulseItem
+import za.co.munipulse.ui.home.WardPulseUi
 
 sealed interface SignInUiState {
     data object Checking : SignInUiState
@@ -57,6 +59,10 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
 
     private val _notifications = MutableStateFlow(notificationStore.read())
     val notifications: StateFlow<NotificationPreferences> = _notifications.asStateFlow()
+
+    private val _wardPulse = MutableStateFlow<WardPulseUi>(WardPulseUi.Idle)
+    val wardPulse: StateFlow<WardPulseUi> = _wardPulse.asStateFlow()
+    private var pulseGeneration = 0
 
     fun updateNotifications(preferences: NotificationPreferences) {
         notificationStore.save(preferences)
@@ -156,7 +162,49 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         requestProfileSync(pushLocal = true)
     }
 
+    fun refreshWardPulse(wardCode: String) {
+        val generation = ++pulseGeneration
+        val ward = WardCatalog.normalize(wardCode)
+        viewModelScope.launch {
+            _wardPulse.value = WardPulseUi.Loading
+            val token = accessToken
+            if (token.isNullOrBlank()) {
+                Log.w(TAG, "Ward pulse skipped. No API session")
+                if (generation == pulseGeneration) {
+                    _wardPulse.value = WardPulseUi.Failed(getApplication<Application>().getString(R.string.report_auth))
+                }
+                return@launch
+            }
+            try {
+                val open = IncidentClient.listWard(token, ward)
+                    .filter { it.status != "Resolved" && it.id.isNotBlank() }
+                    .map { item ->
+                        WardPulseItem(
+                            id = item.id,
+                            category = item.category,
+                            place = placeLabel(item.description),
+                            upvoteCount = item.upvoteCount,
+                        )
+                    }
+                if (generation != pulseGeneration) {
+                    return@launch
+                }
+                Log.i(TAG, "Ward pulse loaded. Ward $ward. Open ${open.size}")
+                _wardPulse.value = WardPulseUi.Ready(open.size, open)
+            } catch (error: Exception) {
+                if (generation != pulseGeneration) {
+                    return@launch
+                }
+                val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
+                Log.e(TAG, "Ward pulse failed: $reason")
+                _wardPulse.value = WardPulseUi.Failed(getApplication<Application>().getString(R.string.pulse_failed))
+            }
+        }
+    }
+
     fun signOut() {
+        pulseGeneration++
+        _wardPulse.value = WardPulseUi.Idle
         accessToken = null
         sessionStore.clear()
         notificationStore.setPendingSync(false)
@@ -378,5 +426,13 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
 
     private companion object {
         const val TAG = "MuniPulseAuth"
+
+        fun placeLabel(description: String): String {
+            val line = description.trim().replace(Regex("\\s+"), " ")
+            if (line.isEmpty()) {
+                return ""
+            }
+            return if (line.length <= 40) line else line.take(40).trimEnd() + "…"
+        }
     }
 }

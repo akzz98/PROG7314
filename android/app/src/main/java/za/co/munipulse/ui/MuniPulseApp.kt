@@ -32,6 +32,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     val restoring by viewModel.restoring.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
     val onboardingDone by viewModel.onboardingComplete.collectAsState()
+    val wardPulse by viewModel.wardPulse.collectAsState()
     val showSplash = splashHold || state is SignInUiState.Checking || restoring
 
     LaunchedEffect(Unit) {
@@ -90,10 +91,13 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             onBack = { showSettings = false },
         )
         current is SignInUiState.SignedIn -> HomeScreen(
-            displayName = current.displayName,
-            email = current.email,
-            sessionNote = current.sessionNote,
+            wardCode = current.defaultWardCode,
+            pulse = wardPulse,
+            onRefresh = viewModel::refreshWardPulse,
+            onWardSelected = viewModel::updateDefaultWard,
             onOpenReport = { showReport = true },
+            onOpenNotifications = { showNotifications = true },
+            onOpenProfile = { showProfile = true },
             onOpenSettings = { showSettings = true },
         )
         !onboardingDone -> OnboardingScreen(onContinue = viewModel::finishOnboarding)

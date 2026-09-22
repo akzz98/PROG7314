@@ -8,10 +8,12 @@ import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
+import retrofit2.http.Query
 import za.co.munipulse.BuildConfig
 
 // Uploads JPEG parts, then posts the incident. The bearer token is never logged.
@@ -60,6 +62,14 @@ object IncidentClient {
         return IncidentCreateOutcome.Created(created.id)
     }
 
+    suspend fun listWard(accessToken: String, wardCode: String): List<IncidentSummaryBody> {
+        val response = api.list(bearer(accessToken), "ward", wardCode, WARD_PAGE)
+        if (!response.isSuccessful) {
+            throw incidentError(response)
+        }
+        return response.body()?.items.orEmpty()
+    }
+
     private fun bearer(accessToken: String) = "Bearer $accessToken"
 
     private fun <T> incidentError(response: Response<T>): IncidentRequestException {
@@ -84,6 +94,8 @@ object IncidentClient {
         }
         return body.substring(from, end)
     }
+
+    private const val WARD_PAGE = 50
 }
 
 private interface IncidentApi {
@@ -99,6 +111,14 @@ private interface IncidentApi {
         @Header("Authorization") authorization: String,
         @Body body: CreateIncidentBody,
     ): Response<CreatedIncidentResponse>
+
+    @GET("api/v1/incidents")
+    suspend fun list(
+        @Header("Authorization") authorization: String,
+        @Query("scope") scope: String,
+        @Query("wardCode") wardCode: String,
+        @Query("limit") limit: Int,
+    ): Response<IncidentListBody>
 }
 
 data class PhotoUploadResponse(val photoIds: List<String> = emptyList())
@@ -115,6 +135,16 @@ data class CreateIncidentBody(
 )
 
 data class CreatedIncidentResponse(val id: String = "")
+
+data class IncidentListBody(val items: List<IncidentSummaryBody> = emptyList())
+
+data class IncidentSummaryBody(
+    val id: String = "",
+    val category: String = "",
+    val description: String = "",
+    val status: String = "",
+    val upvoteCount: Int = 0,
+)
 
 sealed interface IncidentCreateOutcome {
     data class Created(val incidentId: String) : IncidentCreateOutcome
