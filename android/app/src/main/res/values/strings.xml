@@ -38,6 +38,15 @@
     <string name="report_photo_limit">You can add up to 3 photos.</string>
     <string name="report_submit">Submit report</string>
     <string name="report_not_sent">This report is not sent yet.</string>
+    <string name="report_valid">The form is valid. This report is not sent yet.</string>
+    <string name="validation_summary">Fix the fields above before sending.</string>
+    <string name="validation_category">Choose a category such as Pothole.</string>
+    <string name="validation_description">Use between 10 and 1000 characters.</string>
+    <string name="validation_latitude">Latitude must be between -90 and 90. Read a location first.</string>
+    <string name="validation_longitude">Longitude must be between -180 and 180. Read a location first.</string>
+    <string name="validation_accuracy">Accuracy must be between 0 and 10000 metres.</string>
+    <string name="validation_ward">Choose a ward on Settings before you submit.</string>
+    <string name="validation_photos">Attach at most 3 photos.</string>
     <string name="category_pothole">Pothole</string>
     <string name="category_water_leak">Water leak</string>
     <string name="category_illegal_dumping">Illegal dumping</string>

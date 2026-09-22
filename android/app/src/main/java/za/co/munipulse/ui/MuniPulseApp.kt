@@ -55,6 +55,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     when {
         showSplash -> SplashScreen()
         current is SignInUiState.SignedIn && showReport -> CreateIncidentScreen(
+            wardCode = current.defaultWardCode,
             onBack = { showReport = false },
         )
         current is SignInUiState.SignedIn && showProfile -> ProfileScreen(

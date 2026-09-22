@@ -45,6 +45,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import za.co.munipulse.R
 import za.co.munipulse.report.IncidentCategories
+import za.co.munipulse.report.IncidentDraft
+import za.co.munipulse.report.IncidentValidator
 import za.co.munipulse.report.LocationCapture
 import za.co.munipulse.report.LocationFix
 import za.co.munipulse.report.MediaPermissions
@@ -52,6 +54,7 @@ import za.co.munipulse.report.PhotoFiles
 
 @Composable
 fun CreateIncidentScreen(
+    wardCode: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -65,7 +68,8 @@ fun CreateIncidentScreen(
     var photoLimit by remember { mutableStateOf(false) }
     var pendingCapture by remember { mutableStateOf<Uri?>(null) }
     var pendingTake by remember { mutableStateOf(false) }
-    var notSent by remember { mutableStateOf(false) }
+    var formAccepted by remember { mutableStateOf(false) }
+    var fieldErrors by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var access by remember { mutableStateOf(MediaPermissions.current(context)) }
     var asked by remember { mutableStateOf(false) }
 
@@ -180,12 +184,15 @@ fun CreateIncidentScreen(
                 }
             }
         }
+        FieldMessage(fieldErrors["category"])
         OutlinedTextField(
             value = description,
             onValueChange = { description = it },
             label = { Text(text = stringResource(R.string.report_description)) },
             modifier = Modifier.fillMaxWidth(),
             minLines = 4,
+            supportingText = { FieldMessage(fieldErrors["description"]) },
+            isError = fieldErrors.containsKey("description"),
         )
         Text(text = stringResource(R.string.media_rationale), style = MaterialTheme.typography.bodyMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -241,6 +248,7 @@ fun CreateIncidentScreen(
         if (photoLimit) {
             Text(text = stringResource(R.string.report_photo_limit), style = MaterialTheme.typography.bodyMedium)
         }
+        FieldMessage(fieldErrors["photoIds"])
         photos.forEach { uri ->
             PhotoThumb(
                 uri = uri,
@@ -317,20 +325,59 @@ fun CreateIncidentScreen(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
+        FieldMessage(fieldErrors["latitude"])
+        FieldMessage(fieldErrors["longitude"])
+        FieldMessage(fieldErrors["accuracyMeters"])
+        FieldMessage(fieldErrors["wardCode"])
         Spacer(modifier = Modifier.height(8.dp))
         Button(
             onClick = {
-                notSent = true
-                Log.i(TAG, "Create form submit tapped. Report was not sent")
+                val errors = IncidentValidator.validate(
+                    IncidentDraft(
+                        category = category,
+                        description = description,
+                        latitude = fix?.latitude,
+                        longitude = fix?.longitude,
+                        accuracyMeters = fix?.accuracyMeters,
+                        wardCode = wardCode,
+                        photoCount = photos.size,
+                    ),
+                )
+                fieldErrors = errors
+                formAccepted = errors.isEmpty()
+                if (errors.isEmpty()) {
+                    Log.i(TAG, "Create form accepted. Report was not sent")
+                } else {
+                    Log.i(TAG, "Create form rejected. Fields ${errors.keys.joinToString(",")}")
+                }
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(text = stringResource(R.string.report_submit))
         }
-        if (notSent) {
-            Text(text = stringResource(R.string.report_not_sent), style = MaterialTheme.typography.bodyMedium)
+        if (fieldErrors.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.validation_summary),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        if (formAccepted) {
+            Text(text = stringResource(R.string.report_valid), style = MaterialTheme.typography.bodyMedium)
         }
     }
+}
+
+@Composable
+private fun FieldMessage(message: Int?) {
+    if (message == null) {
+        return
+    }
+    Text(
+        text = stringResource(message),
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodyMedium,
+    )
 }
 
 @Composable
