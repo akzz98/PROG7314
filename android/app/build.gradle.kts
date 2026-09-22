@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -10,7 +11,8 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "za.co.munipulse"
+        // Must match the Android package registered in google-services.json.
+        applicationId = "com.munipulse"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -43,6 +45,13 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.google.id)
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)

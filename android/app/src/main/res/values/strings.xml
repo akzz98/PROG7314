@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MuniPulse SA</string>
+    <string name="login_subtitle">Civic reporting for your ward</string>
+    <string name="login_google">Continue with Google</string>
+    <string name="login_working">Contacting Google…</string>
+    <string name="login_firebase_missing">Google sign-in needs google-services.json on this machine. The README lists the Firebase setup steps.</string>
+    <string name="login_web_client_missing">Firebase is connected, but Google sign-in is not finished. Add the debug SHA-1, enable the Google provider, then download google-services.json again.</string>
+    <string name="login_cancelled">Sign-in was cancelled.</string>
+    <string name="login_failed">Google sign-in did not finish. Try again.</string>
+    <string name="signed_in_title">Signed in</string>
+    <string name="signed_in_next">The API session exchange is the next auth step.</string>
+    <string name="sign_out">Sign out</string>
 </resources>

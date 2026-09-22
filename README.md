@@ -23,7 +23,7 @@ Final POE is not in this build: biometric unlock, Room offline sync, FCM, full E
 ## Layout
 
 ```
-android/          Jetpack Compose app (za.co.munipulse)
+android/          Jetpack Compose app (application id com.munipulse)
 api/              MuniPulse.slnx and MuniPulse.Api
 ```
 
@@ -76,6 +76,18 @@ Sample calls are in `api/MuniPulse.Api/MuniPulse.Api.http`.
 Open `android/` in Android Studio (AGP 9.4, Gradle 9.6, compile SDK 37). Studio writes `sdk.dir` into `android/local.properties`. Copy `android/local.properties.example` if you need to set `API_BASE_URL` yourself.
 
 The default API address `http://10.0.2.2:5285/` is the emulator route to the API on your computer. A physical phone needs your PC's LAN address or an HTTPS tunnel.
+
+### Google sign-in
+
+The login screen (S03) uses Firebase Authentication. `android/app/google-services.json` is gitignored. The Google services plugin is `com.google.gms.google-services` 4.5.0, and the Firebase BoM is 34.19.0.
+
+1. The Firebase Android app package is `com.munipulse`. That is the application id in `android/app/build.gradle.kts`.
+2. From `android/`, run `.\gradlew.bat :app:signingReport` and register the debug SHA-1 on that Firebase app.
+3. Enable the Google sign-in provider. That creates a Web client ID.
+4. Download `google-services.json` again into `android/app/`, replacing the current file. Do not commit it. The file is only complete after the Web client appears under `oauth_client`.
+5. Rebuild and run on a device or emulator with Google Play. Tap **Continue with Google**.
+
+A successful sign-in stays inside Firebase for now. Exchanging that ID token for the API JWT is the next auth task. Sign-in logs record the Firebase uid only, never the ID token.
 
 The SDK used for the scaffold compile is `%LOCALAPPDATA%\Android\Sdk` (platform 37). `android/local.properties` is generated locally and gitignored. `ANDROID_HOME` does not need to be set when that file contains `sdk.dir`.
 

@@ -5,17 +5,17 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import za.co.munipulse.ui.splash.SplashScreen
+import za.co.munipulse.ui.MuniPulseApp
 import za.co.munipulse.ui.theme.MuniPulseTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.i(TAG, "S01 splash shown. Session routing is added in M2.")
+        Log.i(TAG, "MainActivity created")
         enableEdgeToEdge()
         setContent {
             MuniPulseTheme {
-                SplashScreen()
+                MuniPulseApp()
             }
         }
     }
