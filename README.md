@@ -100,6 +100,8 @@ When a session exists, the app calls `GET /api/v1/me`. Changing the ward or tick
 
 Settings opens notification preferences: ticket status and area emergencies start on, and marketing and news start off. Those three choices stay on the device. Push delivery is Final POE and is not implemented.
 
+Language, biometric unlock, and the sync centre are visible on Settings and marked **Coming in Final POE**. They do not open a language picker, a fingerprint prompt, or an offline queue.
+
 Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
 
 `Firebase:ProjectId` in `appsettings.json` must match the Firebase project (`munipulse-987ce`). The API still needs `Jwt:SigningKey` in user-secrets before it can issue a session.

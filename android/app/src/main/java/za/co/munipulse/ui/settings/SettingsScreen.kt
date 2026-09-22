@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -110,13 +113,57 @@ fun SettingsScreen(
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
+        FinalPoeRow(
+            title = stringResource(R.string.settings_language),
+            detail = stringResource(R.string.settings_final_poe),
+        )
         OutlinedButton(onClick = onOpenNotifications, modifier = Modifier.fillMaxWidth()) {
             Text(text = stringResource(R.string.settings_notifications))
         }
+        FinalPoeSwitchRow(
+            title = stringResource(R.string.settings_biometric),
+            detail = stringResource(R.string.settings_final_poe),
+        )
+        FinalPoeRow(
+            title = stringResource(R.string.settings_sync),
+            detail = stringResource(R.string.settings_final_poe),
+        )
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
             Text(text = stringResource(R.string.sign_out))
         }
+    }
+}
+
+// FINAL POE: S10 language, S12 biometric unlock, and S13 sync centre stay closed in Part 2.
+@Composable
+private fun FinalPoeRow(title: String, detail: String) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(text = title, style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = detail,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun FinalPoeSwitchRow(title: String, detail: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = false, onCheckedChange = null, enabled = false)
     }
 }
 

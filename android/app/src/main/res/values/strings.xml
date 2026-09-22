@@ -16,6 +16,10 @@
     <string name="settings_ward">Default ward</string>
     <string name="settings_ward_value">%1$s · %2$s %3$s</string>
     <string name="settings_notifications">Notifications</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_biometric">Biometric unlock</string>
+    <string name="settings_sync">Sync centre</string>
+    <string name="settings_final_poe">Coming in Final POE</string>
     <string name="notifications_title">Notifications</string>
     <string name="notifications_local_note">Saved on this device. Push alerts are not sent.</string>
     <string name="notifications_ticket_status">Ticket status</string>
