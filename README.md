@@ -35,7 +35,7 @@ Requires the .NET 10 SDK.
 dotnet run --project api/MuniPulse.Api --launch-profile http
 ```
 
-`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, the 250 metre duplicate window, the field-worker demo key comparison, and unauthenticated calls. They do not need Firebase, MongoDB, or a JWT signing key.
+`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, the 250 metre duplicate window, the field-worker demo key comparison, and unauthenticated calls. They do not need Firebase, MongoDB, or a JWT signing key. `.github/workflows/api.yml` runs the same command on every push.
 
 Health check: [http://localhost:5285/health](http://localhost:5285/health)
 
@@ -93,7 +93,7 @@ Open `android/` in Android Studio (AGP 9.4, Gradle 9.6, compile SDK 37). Studio 
 
 The default API address `http://10.0.2.2:5285/` is the emulator route to the API on your computer. A physical phone needs your PC's LAN address or an HTTPS tunnel.
 
-From `android/`, `.\gradlew.bat :app:testDebugUnitTest` runs the incident form validator tests. Those tests do not need Firebase, MongoDB, or a device.
+From `android/`, `.\gradlew.bat :app:testDebugUnitTest` runs the incident form validator tests. Those tests do not need Firebase, MongoDB, or a device. `.github/workflows/android.yml` runs the same task on every push. GitHub-hosted runners do not include the Android SDK, so the job installs JDK 21 and compile SDK 37, then copies `google-services.json.example` over the gitignored Firebase file. It does not start an emulator. If platform 37 is missing from the SDK manager, the job cannot compile.
 
 ### Google sign-in
 
