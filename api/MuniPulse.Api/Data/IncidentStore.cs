@@ -39,7 +39,7 @@ public sealed class IncidentStore
         }
         catch (Exception ex) when (ex is FormatException or ArgumentException)
         {
-            _logger.LogError(ex, "MongoDb:ConnectionString could not be parsed.");
+            _logger.LogError("MongoDb:ConnectionString could not be parsed ({ExceptionType}).", ex.GetType().Name);
         }
     }
 
@@ -353,7 +353,9 @@ public sealed class IncidentStore
 
     private ApiException DatabaseFailure(MongoException exception)
     {
-        _logger.LogError(exception, "MongoDB operation failed. Correlation is on the HTTP response.");
+        _logger.LogError(
+            "MongoDB operation failed ({ExceptionType}). Correlation is on the HTTP response.",
+            exception.GetType().Name);
         return new ApiException(
             StatusCodes.Status503ServiceUnavailable,
             "DATABASE_UNAVAILABLE",

@@ -5,6 +5,8 @@ using MuniPulse.Api.Endpoints;
 using MuniPulse.Api.Errors;
 using Microsoft.AspNetCore.Http.Json;
 
+LogSafety.DisableTokenLogging();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
@@ -77,7 +79,10 @@ app.Use(async (context, next) =>
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Unhandled API error. Correlation {CorrelationId}", context.TraceIdentifier);
+        logger.LogError(
+            "Unhandled API error {ExceptionType}. Correlation {CorrelationId}",
+            ex.GetType().Name,
+            context.TraceIdentifier);
         if (!context.Response.HasStarted)
         {
             await ApiErrors.WriteAsync(
@@ -132,7 +137,9 @@ try
 }
 catch (Exception ex)
 {
-    app.Logger.LogError(ex, "MongoDB seed failed. Data routes will report a database error until the cluster is reachable.");
+    app.Logger.LogError(
+        "MongoDB seed failed ({ExceptionType}). Data routes will report a database error until the cluster is reachable.",
+        ex.GetType().Name);
 }
 
 app.Run();
