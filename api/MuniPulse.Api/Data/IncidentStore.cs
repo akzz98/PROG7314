@@ -279,6 +279,38 @@ public sealed class IncidentStore
         DateTime createdSince,
         CancellationToken cancellationToken)
     {
+        var ranked = await RankOpenDuplicatesAsync(wardCode, category, latitude, longitude, createdSince, cancellationToken);
+        return ranked.Count == 0 ? null : ranked[0].Incident;
+    }
+
+    public async Task<IReadOnlyList<NearbyDuplicate>> ListNearbyDuplicatesAsync(
+        string wardCode,
+        string category,
+        double latitude,
+        double longitude,
+        DateTime createdSince,
+        CancellationToken cancellationToken)
+    {
+        var ranked = await RankOpenDuplicatesAsync(wardCode, category, latitude, longitude, createdSince, cancellationToken);
+        return ranked
+            .Take(10)
+            .Select(match => new NearbyDuplicate(
+                match.Incident.Id,
+                match.Incident.Category,
+                ShortPlace(match.Incident.Description),
+                match.Incident.UpvoteCount,
+                (int)Math.Round(match.Meters, MidpointRounding.AwayFromZero)))
+            .ToArray();
+    }
+
+    private async Task<List<RankedIncident>> RankOpenDuplicatesAsync(
+        string wardCode,
+        string category,
+        double latitude,
+        double longitude,
+        DateTime createdSince,
+        CancellationToken cancellationToken)
+    {
         var filter = Builders<IncidentReport>.Filter.And(
             Builders<IncidentReport>.Filter.Eq(incident => incident.WardCode, wardCode),
             Builders<IncidentReport>.Filter.Eq(incident => incident.Category, category),
@@ -293,25 +325,37 @@ public sealed class IncidentStore
                 .Find(filter)
                 .Limit(200)
                 .ToListAsync(cancellationToken);
-            IncidentReport? nearest = null;
-            var nearestMeters = double.MaxValue;
+            var ranked = new List<RankedIncident>();
             foreach (var candidate in candidates)
             {
                 var meters = DuplicateWindow.MetersBetween(latitude, longitude, candidate.Latitude, candidate.Longitude);
-                if (meters <= DuplicateWindow.RadiusMeters && meters < nearestMeters)
+                if (meters <= DuplicateWindow.RadiusMeters)
                 {
-                    nearest = candidate;
-                    nearestMeters = meters;
+                    ranked.Add(new RankedIncident(candidate, meters));
                 }
             }
 
-            return nearest;
+            ranked.Sort(static (left, right) => left.Meters.CompareTo(right.Meters));
+            return ranked;
         }
         catch (MongoException ex)
         {
             throw DatabaseFailure(ex);
         }
     }
+
+    private static string ShortPlace(string description)
+    {
+        var line = string.Join(' ', description.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (line.Length <= 40)
+        {
+            return line;
+        }
+
+        return line[..40].TrimEnd() + "…";
+    }
+
+    private readonly record struct RankedIncident(IncidentReport Incident, double Meters);
 
     public async Task SetAggregateIdAsync(string incidentId, string aggregateId, CancellationToken cancellationToken)
     {
@@ -462,6 +506,13 @@ public sealed class IncidentStore
 }
 
 public sealed record IncidentPage(IReadOnlyList<IncidentReport> Items, string? NextCursor);
+
+public sealed record NearbyDuplicate(
+    string Id,
+    string Category,
+    string Place,
+    int UpvoteCount,
+    int DistanceMeters);
 
 public sealed record WardAggregate(
     string AggregateId,

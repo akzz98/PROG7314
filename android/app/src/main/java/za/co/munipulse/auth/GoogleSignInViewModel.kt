@@ -20,6 +20,8 @@ import za.co.munipulse.report.IncidentDraft
 import za.co.munipulse.report.IncidentSubmitResult
 import za.co.munipulse.report.IncidentValidator
 import za.co.munipulse.report.PhotoFiles
+import za.co.munipulse.ui.report.NearbyDuplicate
+import za.co.munipulse.ui.report.NearbyUi
 import za.co.munipulse.ui.home.WardPulseItem
 import za.co.munipulse.ui.home.WardPulseUi
 import za.co.munipulse.ui.incidents.HotspotGroup
@@ -80,6 +82,9 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private val _detail = MutableStateFlow<IncidentDetailUi>(IncidentDetailUi.Idle)
     val detail: StateFlow<IncidentDetailUi> = _detail.asStateFlow()
     private var detailGeneration = 0
+    private val _nearby = MutableStateFlow<NearbyUi>(NearbyUi.Idle)
+    val nearby: StateFlow<NearbyUi> = _nearby.asStateFlow()
+    private var nearbyGeneration = 0
     private val _hotspots = MutableStateFlow<WardHotspotsUi>(WardHotspotsUi.Idle)
     val hotspots: StateFlow<WardHotspotsUi> = _hotspots.asStateFlow()
     private var hotspotGeneration = 0
@@ -333,6 +338,52 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    fun lookupNearby(category: String, latitude: Double, longitude: Double, wardCode: String) {
+        val generation = ++nearbyGeneration
+        val ward = WardCatalog.normalize(wardCode)
+        viewModelScope.launch {
+            _nearby.value = NearbyUi.Loading
+            val token = accessToken
+            if (token.isNullOrBlank()) {
+                Log.w(TAG, "Nearby lookup skipped. No API session")
+                if (generation == nearbyGeneration) {
+                    _nearby.value = NearbyUi.Failed(getApplication<Application>().getString(R.string.report_auth))
+                }
+                return@launch
+            }
+            try {
+                val items = IncidentClient.listNearby(token, category, latitude, longitude, ward)
+                    .filter { it.id.isNotBlank() }
+                    .map { item ->
+                        NearbyDuplicate(
+                            id = item.id,
+                            category = item.category,
+                            place = item.place,
+                            upvoteCount = item.upvoteCount,
+                            distanceMeters = item.distanceMeters,
+                        )
+                    }
+                if (generation != nearbyGeneration) {
+                    return@launch
+                }
+                Log.i(TAG, "Nearby duplicates loaded. Count ${items.size}")
+                _nearby.value = NearbyUi.Ready(items)
+            } catch (error: Exception) {
+                if (generation != nearbyGeneration) {
+                    return@launch
+                }
+                val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
+                Log.e(TAG, "Nearby lookup failed: $reason")
+                _nearby.value = NearbyUi.Failed(getApplication<Application>().getString(R.string.nearby_failed))
+            }
+        }
+    }
+
+    fun clearNearby() {
+        nearbyGeneration++
+        _nearby.value = NearbyUi.Idle
+    }
+
     fun refreshHotspots(wardCode: String) {
         val generation = ++hotspotGeneration
         val ward = WardCatalog.normalize(wardCode)
@@ -480,6 +531,8 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         mineGeneration++
         detailGeneration++
         hotspotGeneration++
+        nearbyGeneration++
+        _nearby.value = NearbyUi.Idle
         upvoteInFlight = false
         _upvoteBusy.value = false
         _hotspots.value = WardHotspotsUi.Idle

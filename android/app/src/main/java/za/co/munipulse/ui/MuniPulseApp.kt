@@ -44,6 +44,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     val detail by viewModel.detail.collectAsState()
     val upvoteBusy by viewModel.upvoteBusy.collectAsState()
     val hotspots by viewModel.hotspots.collectAsState()
+    val nearby by viewModel.nearby.collectAsState()
     val showSplash = splashHold || state is SignInUiState.Checking || restoring
 
     LaunchedEffect(Unit) {
@@ -68,8 +69,14 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
         showSplash -> SplashScreen()
         current is SignInUiState.SignedIn && showReport -> CreateIncidentScreen(
             wardCode = current.defaultWardCode,
+            nearby = nearby,
+            onLookupNearby = viewModel::lookupNearby,
+            onClearNearby = viewModel::clearNearby,
             onSubmit = viewModel::submitIncident,
-            onBack = { showReport = false },
+            onBack = {
+                viewModel.clearNearby()
+                showReport = false
+            },
         )
         current is SignInUiState.SignedIn && showProfile -> ProfileScreen(
             displayName = current.displayName,

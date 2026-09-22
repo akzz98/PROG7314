@@ -19,6 +19,7 @@ public static class ApiEndpoints
         api.MapPost("/incidents/photos", UploadPhotos).RequireAuthorization().RequireRateLimiting("writes").DisableAntiforgery();
         api.MapGet("/incidents/photos/{id}", GetPhoto).RequireAuthorization();
         api.MapGet("/incidents/aggregates", ListAggregates).RequireAuthorization();
+        api.MapGet("/incidents/nearby", ListNearby).RequireAuthorization();
         api.MapGet("/incidents/{id}", GetIncident).RequireAuthorization();
         api.MapGet("/incidents", ListIncidents).RequireAuthorization();
         api.MapPost("/incidents/{id}/upvotes", Upvote).RequireAuthorization().RequireRateLimiting("writes");
@@ -376,6 +377,70 @@ public static class ApiEndpoints
         var groups = await store.ListOpenAggregatesAsync(resolvedWard, cancellationToken);
         logger.LogInformation("Ward aggregates loaded for {WardCode}. Groups {GroupCount}", resolvedWard, groups.Count);
         return Results.Ok(new AggregateListResponse(groups.Select(ToAggregate).ToArray()));
+    }
+
+    private static async Task<IResult> ListNearby(
+        string? category,
+        double? latitude,
+        double? longitude,
+        string? wardCode,
+        HttpContext http,
+        IncidentStore store,
+        ILogger<IncidentStore> logger,
+        CancellationToken cancellationToken)
+    {
+        var user = await RequireUserAsync(http, store, cancellationToken);
+        if (user is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Sign in is required.");
+        }
+
+        var fields = new Dictionary<string, string>();
+        if (!IncidentCategories.IsKnown(category))
+        {
+            fields["category"] = "Choose a category such as Pothole.";
+        }
+
+        if (latitude is null or < -90 or > 90)
+        {
+            fields["latitude"] = "Latitude must be between -90 and 90.";
+        }
+
+        if (longitude is null or < -180 or > 180)
+        {
+            fields["longitude"] = "Longitude must be between -180 and 180.";
+        }
+
+        var resolvedWard = string.IsNullOrWhiteSpace(wardCode) ? user.DefaultWardCode : wardCode.Trim();
+        if (string.IsNullOrWhiteSpace(resolvedWard) || !WardCatalog.IsKnown(resolvedWard))
+        {
+            fields["wardCode"] = "A nearby search needs a demo ward such as JHB-23.";
+        }
+
+        if (fields.Count > 0)
+        {
+            return ApiErrors.Result(
+                http,
+                StatusCodes.Status400BadRequest,
+                "VALIDATION_ERROR",
+                "One or more fields are invalid.",
+                fields);
+        }
+
+        var matches = await store.ListNearbyDuplicatesAsync(
+            resolvedWard!,
+            category!.Trim(),
+            latitude!.Value,
+            longitude!.Value,
+            DateTime.UtcNow.AddDays(-DuplicateWindow.MaxAgeDays),
+            cancellationToken);
+        logger.LogInformation("Nearby duplicates loaded for ward {WardCode}. Count {MatchCount}", resolvedWard, matches.Count);
+        return Results.Ok(new NearbyListResponse(matches.Select(match => new NearbyDuplicateResponse(
+            match.Id,
+            match.Category,
+            match.Place,
+            match.UpvoteCount,
+            match.DistanceMeters)).ToArray()));
     }
 
     private static AggregateSummary ToAggregate(WardAggregate group) =>
@@ -842,6 +907,15 @@ public sealed record CreateIncidentResponse(
     DateTime CreatedAt);
 
 public sealed record UpvoteResponse(int UpvoteCount, string? AggregateId);
+
+public sealed record NearbyListResponse(NearbyDuplicateResponse[] Items);
+
+public sealed record NearbyDuplicateResponse(
+    string Id,
+    string Category,
+    string Place,
+    int UpvoteCount,
+    int DistanceMeters);
 
 public sealed record AggregateListResponse(AggregateSummary[] Items);
 

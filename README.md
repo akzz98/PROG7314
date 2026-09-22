@@ -63,6 +63,7 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 | POST | `/api/v1/incidents/photos` | Bearer API JWT. Multipart JPEG files, 1 to 3, each under 5 MB. Saved under `App_Data/incident-photos` on the API machine. |
 | GET | `/api/v1/incidents/photos/{id}` | Bearer API JWT. Returns that JPEG when it is still on disk. |
 | GET | `/api/v1/incidents/aggregates` | Bearer API JWT. Open reports in the ward, grouped when they share an `aggregateId`. |
+| GET | `/api/v1/incidents/nearby` | Bearer API JWT. Open reports in the same ward and category within 250 metres and 14 days. |
 | POST | `/api/v1/incidents/{id}/upvotes` | Bearer API JWT. One vote per user. |
 | POST | `/api/v1/incidents/{id}/milestones` | FieldWorker role, or header `X-Demo-Api-Key` |
 
@@ -109,7 +110,7 @@ Settings includes a POPIA-style privacy note: name, email, ward, location, and p
 
 Settings opens Profile. That screen shows the name, masked email, default ward, language, and role. Impact score and badges are marked **Coming in Final POE** and are not shown.
 
-Home opens **New incident**. The form has a category (pothole, water leak, illegal dumping, streetlight, sewage, or other), a description, up to three photo previews from the camera or gallery, and a GPS line with **Refresh GPS**. Denying camera, gallery, or location stays on the screen and does not close the app. **Submit report** checks the category, a description of 10 to 1000 characters, a latitude and longitude, accuracy when a fix has one, the default ward, and a maximum of three photos. Invalid input stays on the screen. A valid form uploads the photos as JPEG multipart, then `POST /api/v1/incidents` with a stable `clientMutationId`. A retry of that same form returns the already-submitted message instead of a second row. Logcat records permission results, create success or failure, and the accuracy in metres. It does not record the coordinates, the description, or a token.
+Home opens **New incident**. The form has a category (pothole, water leak, illegal dumping, streetlight, sewage, or other), a description, up to three photo previews from the camera or gallery, and a GPS line with **Refresh GPS**. Denying camera, gallery, or location stays on the screen and does not close the app. **Submit report** checks the category, a description of 10 to 1000 characters, a latitude and longitude, accuracy when a fix has one, the default ward, and a maximum of three photos. Invalid input stays on the screen. When a location is set, the form asks `GET /api/v1/incidents/nearby` and can expand **Nearby duplicates** with the category, a short place line, the upvote count, and the distance. A valid form uploads the photos as JPEG multipart, then `POST /api/v1/incidents` with a stable `clientMutationId`. A retry of that same form returns the already-submitted message instead of a second row. Logcat records permission results, create success or failure, and the accuracy in metres. It does not record the coordinates, the description, or a token.
 
 Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
 

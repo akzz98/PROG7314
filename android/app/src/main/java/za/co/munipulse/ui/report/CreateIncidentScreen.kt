@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import za.co.munipulse.R
@@ -52,10 +53,14 @@ import za.co.munipulse.report.LocationCapture
 import za.co.munipulse.report.LocationFix
 import za.co.munipulse.report.MediaPermissions
 import za.co.munipulse.report.PhotoFiles
+import za.co.munipulse.ui.home.categoryName
 
 @Composable
 fun CreateIncidentScreen(
     wardCode: String,
+    nearby: NearbyUi,
+    onLookupNearby: (String, Double, Double, String) -> Unit,
+    onClearNearby: () -> Unit,
     onSubmit: suspend (IncidentDraft, List<Uri>, String) -> IncidentSubmitResult,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -125,6 +130,17 @@ fun CreateIncidentScreen(
     var locationDenied by remember { mutableStateOf(false) }
     var locationMissing by remember { mutableStateOf(false) }
     var fix by remember { mutableStateOf<LocationFix?>(null) }
+    var nearbyOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(category, fix?.latitude, fix?.longitude, wardCode) {
+        val currentFix = fix
+        if (currentFix == null) {
+            nearbyOpen = false
+            onClearNearby()
+            return@LaunchedEffect
+        }
+        delay(400)
+        onLookupNearby(category, currentFix.latitude, currentFix.longitude, wardCode)
+    }
     val locationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { result ->
@@ -336,6 +352,7 @@ fun CreateIncidentScreen(
         FieldMessage(fieldErrors["accuracyMeters"])
         FieldMessage(fieldErrors["wardCode"])
         Spacer(modifier = Modifier.height(8.dp))
+        NearbyDuplicates(nearby, nearbyOpen, onToggle = { nearbyOpen = !nearbyOpen })
         Button(
             onClick = {
                 if (submitting) {
@@ -409,6 +426,40 @@ fun CreateIncidentScreen(
             )
         }
     }
+}
+
+@Composable
+private fun NearbyDuplicates(nearby: NearbyUi, expanded: Boolean, onToggle: () -> Unit) {
+    when (nearby) {
+        NearbyUi.Idle -> Unit
+        NearbyUi.Loading -> Text(text = stringResource(R.string.nearby_checking), style = MaterialTheme.typography.bodyMedium)
+        is NearbyUi.Failed -> Text(
+            text = nearby.message,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        is NearbyUi.Ready -> {
+            if (nearby.items.isEmpty()) {
+                Text(text = stringResource(R.string.nearby_none), style = MaterialTheme.typography.bodyMedium)
+            } else {
+                TextButton(onClick = onToggle) {
+                    Text(text = stringResource(R.string.nearby_title, nearby.items.size) + if (expanded) " ▴" else " ▾")
+                }
+                if (expanded) {
+                    nearby.items.forEach { item ->
+                        val category = categoryName(item.category)
+                        val line = if (item.place.isBlank()) {
+                            stringResource(R.string.nearby_row_plain, category, item.upvoteCount, item.distanceMeters)
+                        } else {
+                            stringResource(R.string.nearby_row, category, item.place, item.upvoteCount, item.distanceMeters)
+                        }
+                        Text(text = line, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 4.dp))
+                    }
+                }
+            }
+        }
+    }
+    Spacer(modifier = Modifier.height(8.dp))
 }
 
 @Composable

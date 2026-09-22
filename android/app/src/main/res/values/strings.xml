@@ -86,6 +86,12 @@
     <string name="report_photo_remove">Remove</string>
     <string name="report_photo_limit">You can add up to 3 photos.</string>
     <string name="report_submit">Submit report</string>
+    <string name="nearby_checking">Checking nearby reports…</string>
+    <string name="nearby_title">Nearby duplicates (%1$d)</string>
+    <string name="nearby_none">No open reports are this close.</string>
+    <string name="nearby_failed">Nearby reports did not load. You can still submit.</string>
+    <string name="nearby_row">%1$s · %2$s · ↑%3$d · %4$d m</string>
+    <string name="nearby_row_plain">%1$s · ↑%2$d · %3$d m</string>
     <string name="report_not_sent">This report is not sent yet.</string>
     <string name="report_valid">The form is valid. This report is not sent yet.</string>
     <string name="report_sending">Sending report…</string>

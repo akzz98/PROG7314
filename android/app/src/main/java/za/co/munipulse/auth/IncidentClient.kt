@@ -63,6 +63,20 @@ object IncidentClient {
         return IncidentCreateOutcome.Created(created.id)
     }
 
+    suspend fun listNearby(
+        accessToken: String,
+        category: String,
+        latitude: Double,
+        longitude: Double,
+        wardCode: String,
+    ): List<NearbyDuplicateBody> {
+        val response = api.nearby(bearer(accessToken), category, latitude, longitude, wardCode)
+        if (!response.isSuccessful) {
+            throw incidentError(response)
+        }
+        return response.body()?.items.orEmpty()
+    }
+
     suspend fun listAggregates(accessToken: String, wardCode: String): List<AggregateBody> {
         val response = api.aggregates(bearer(accessToken), wardCode)
         if (!response.isSuccessful) {
@@ -171,6 +185,15 @@ private interface IncidentApi {
         @Body body: CreateIncidentBody,
     ): Response<CreatedIncidentResponse>
 
+    @GET("api/v1/incidents/nearby")
+    suspend fun nearby(
+        @Header("Authorization") authorization: String,
+        @Query("category") category: String,
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
+        @Query("wardCode") wardCode: String,
+    ): Response<NearbyListBody>
+
     @GET("api/v1/incidents/aggregates")
     suspend fun aggregates(
         @Header("Authorization") authorization: String,
@@ -221,6 +244,16 @@ data class CreateIncidentBody(
 data class CreatedIncidentResponse(val id: String = "")
 
 data class IncidentListBody(val items: List<IncidentSummaryBody> = emptyList())
+
+data class NearbyListBody(val items: List<NearbyDuplicateBody> = emptyList())
+
+data class NearbyDuplicateBody(
+    val id: String = "",
+    val category: String = "",
+    val place: String = "",
+    val upvoteCount: Int = 0,
+    val distanceMeters: Int = 0,
+)
 
 data class AggregateListBody(val items: List<AggregateBody> = emptyList())
 
