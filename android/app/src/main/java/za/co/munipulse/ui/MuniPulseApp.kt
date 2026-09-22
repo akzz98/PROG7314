@@ -59,6 +59,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             displayName = current.displayName,
             email = current.email,
             defaultWardCode = current.defaultWardCode,
+            profileNote = current.profileNote,
             onWardSelected = viewModel::updateDefaultWard,
             onOpenNotifications = { showNotifications = true },
             onSignOut = {

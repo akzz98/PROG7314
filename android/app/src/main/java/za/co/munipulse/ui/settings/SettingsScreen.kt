@@ -36,6 +36,7 @@ fun SettingsScreen(
     displayName: String,
     email: String,
     defaultWardCode: String,
+    profileNote: String,
     onWardSelected: (String) -> Unit,
     onOpenNotifications: () -> Unit,
     onSignOut: () -> Unit,
@@ -100,6 +101,13 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+        if (profileNote.isNotEmpty()) {
+            Text(
+                text = profileNote,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedButton(onClick = onOpenNotifications, modifier = Modifier.fillMaxWidth()) {

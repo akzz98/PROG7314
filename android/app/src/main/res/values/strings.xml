@@ -32,5 +32,6 @@
     <string name="onboarding_page_dot">Page %1$d of %2$d</string>
     <string name="session_ready">API session is ready.</string>
     <string name="session_failed">Google sign-in worked, but the API session did not. Check that the API is running.</string>
+    <string name="profile_sync_failed">Saved on this device. The profile could not be updated online.</string>
     <string name="sign_out">Sign out</string>
 </resources>

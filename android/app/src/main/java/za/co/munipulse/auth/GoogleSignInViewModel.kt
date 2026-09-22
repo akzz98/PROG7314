@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import za.co.munipulse.R
 
@@ -24,6 +26,7 @@ sealed interface SignInUiState {
         val email: String,
         val sessionNote: String,
         val defaultWardCode: String,
+        val profileNote: String = "",
     ) : SignInUiState
     data object MissingConfig : SignInUiState
     data object MissingWebClient : SignInUiState
@@ -37,6 +40,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private val onboardingStore = OnboardingStore(application)
     private val notificationStore = NotificationStore(application)
     private var accessToken: String? = null
+    private val profileMutex = Mutex()
 
     private val _restoring = MutableStateFlow(false)
     val restoring: StateFlow<Boolean> = _restoring.asStateFlow()
@@ -49,7 +53,9 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
 
     fun updateNotifications(preferences: NotificationPreferences) {
         notificationStore.save(preferences)
+        notificationStore.setPendingSync(true)
         _notifications.value = preferences
+        requestProfileSync(pushLocal = true)
     }
 
     fun finishOnboarding() {
@@ -95,6 +101,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 context.getString(R.string.session_ready),
                 stored.defaultWardCode,
             )
+            requestProfileSync(pushLocal = false)
             return
         }
         _restoring.value = true
@@ -107,7 +114,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         }
         _state.value = SignInUiState.Working
         viewModelScope.launch {
-            _state.value = try {
+            val next = try {
                 val user = GoogleSignIn.signIn(activity)
                 sessionState(user)
             } catch (cancelled: GetCredentialCancellationException) {
@@ -122,6 +129,10 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 Log.e(TAG, "Google sign-in failed: ${error.javaClass.simpleName}")
                 SignInUiState.Failed(activity.getString(R.string.login_failed))
             }
+            _state.value = next
+            if (next is SignInUiState.SignedIn) {
+                requestProfileSync(pushLocal = false)
+            }
         }
     }
 
@@ -132,12 +143,15 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             return
         }
         _state.value = current.copy(defaultWardCode = code)
+        notificationStore.setPendingSync(true)
         Log.i(TAG, "Default ward set to $code")
+        requestProfileSync(pushLocal = true)
     }
 
     fun signOut() {
         accessToken = null
         sessionStore.clear()
+        notificationStore.setPendingSync(false)
         GoogleSignIn.signOut(getApplication())
         Log.i(TAG, "Signed out")
         refresh()
@@ -146,8 +160,12 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private fun exchangeSession(user: FirebaseUser) {
         _state.value = SignInUiState.Working
         viewModelScope.launch {
-            _state.value = sessionState(user)
+            val next = sessionState(user)
+            _state.value = next
             _restoring.value = false
+            if (next is SignInUiState.SignedIn) {
+                requestProfileSync(pushLocal = false)
+            }
         }
     }
 
@@ -160,8 +178,14 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             accessToken = session.accessToken
             val name = user.displayName?.takeIf { it.isNotBlank() } ?: "Google account"
             val email = user.email.orEmpty()
-            ward = WardCatalog.normalize(session.user.defaultWardCode)
+            val serverWard = WardCatalog.normalize(session.user.defaultWardCode)
+            val pending = notificationStore.isPendingSync()
+            ward = if (pending) sessionStore.read()?.defaultWardCode ?: serverWard else serverWard
             sessionStore.save(session, name, email, ward)
+            if (!pending) {
+                session.user.preferredLanguage?.let(sessionStore::updateLanguage)
+                applyRemoteNotifications(session.user.notifications)
+            }
             Log.i(TAG, "API session issued for user ${session.user.id}")
             getApplication<Application>().getString(R.string.session_ready)
         } catch (error: Exception) {
@@ -179,6 +203,72 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             note ?: getApplication<Application>().getString(R.string.session_failed),
             ward,
         )
+    }
+
+    private fun requestProfileSync(pushLocal: Boolean) {
+        val token = accessToken ?: return
+        viewModelScope.launch {
+            profileMutex.withLock {
+                val shouldPush = pushLocal || notificationStore.isPendingSync()
+                try {
+                    val profile = if (shouldPush) {
+                        ProfileClient.patch(token, currentPatchBody())
+                    } else {
+                        ProfileClient.get(token)
+                    }
+                    applyRemote(profile)
+                } catch (error: Exception) {
+                    Log.e(TAG, "Profile sync failed: ${error.javaClass.simpleName}")
+                    if (shouldPush) {
+                        notificationStore.setPendingSync(true)
+                        val current = _state.value as? SignInUiState.SignedIn ?: return@withLock
+                        _state.value = current.copy(
+                            profileNote = getApplication<Application>().getString(R.string.profile_sync_failed),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun currentPatchBody(): PatchMeBody {
+        val ward = (_state.value as? SignInUiState.SignedIn)?.defaultWardCode ?: WardCatalog.DEFAULT
+        val notes = _notifications.value
+        return PatchMeBody(
+            defaultWardCode = ward,
+            preferredLanguage = sessionStore.readLanguage(),
+            notifications = ApiNotifications(notes.ticketStatus, notes.areaEmergencies),
+        )
+    }
+
+    private fun applyRemote(profile: UserProfileDto) {
+        val ward = WardCatalog.normalize(profile.defaultWardCode)
+        sessionStore.updateWard(ward)
+        profile.preferredLanguage?.let(sessionStore::updateLanguage)
+        applyRemoteNotifications(profile.notifications)
+        notificationStore.setPendingSync(false)
+        val current = _state.value as? SignInUiState.SignedIn
+        if (current != null) {
+            _state.value = current.copy(
+                displayName = profile.displayName?.takeIf { it.isNotBlank() } ?: current.displayName,
+                email = profile.email?.takeIf { it.isNotBlank() } ?: current.email,
+                defaultWardCode = ward,
+                profileNote = "",
+            )
+        }
+        Log.i(TAG, "Profile synced for user ${profile.id}")
+    }
+
+    private fun applyRemoteNotifications(remote: ApiNotifications?) {
+        if (remote == null) {
+            return
+        }
+        val merged = _notifications.value.copy(
+            ticketStatus = remote.ticketStatus,
+            areaEmergencies = remote.areaEmergencies,
+        )
+        notificationStore.save(merged)
+        _notifications.value = merged
     }
 
     private fun signedIn(

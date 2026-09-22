@@ -37,6 +37,18 @@ class SessionStore(context: Context) {
         return true
     }
 
+    fun updateLanguage(code: String) {
+        if (code != "en" && code != "zu") {
+            return
+        }
+        preferences.edit().putString(KEY_LANGUAGE, code).apply()
+    }
+
+    fun readLanguage(): String? {
+        val code = preferences.getString(KEY_LANGUAGE, null)
+        return if (code == "en" || code == "zu") code else null
+    }
+
     fun read(): StoredSession? {
         val token = preferences.getString(KEY_TOKEN, null) ?: return null
         val userId = preferences.getString(KEY_USER_ID, null) ?: return null
@@ -71,6 +83,7 @@ class SessionStore(context: Context) {
         const val KEY_DISPLAY_NAME = "display_name"
         const val KEY_EMAIL = "email"
         const val KEY_WARD = "default_ward"
+        const val KEY_LANGUAGE = "preferred_language"
     }
 }
 

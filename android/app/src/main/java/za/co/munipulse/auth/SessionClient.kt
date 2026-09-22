@@ -56,6 +56,8 @@ data class SessionUser(
     val displayName: String? = null,
     val email: String? = null,
     val defaultWardCode: String? = null,
+    val preferredLanguage: String? = null,
+    val notifications: ApiNotifications? = null,
 )
 
 class SessionExchangeException(message: String) : IllegalStateException(message)

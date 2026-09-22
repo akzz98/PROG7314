@@ -19,6 +19,12 @@ class NotificationStore(context: Context) {
         marketingNews = preferences.getBoolean(KEY_MARKETING, false),
     )
 
+    fun isPendingSync(): Boolean = preferences.getBoolean(KEY_PENDING_SYNC, false)
+
+    fun setPendingSync(pending: Boolean) {
+        preferences.edit().putBoolean(KEY_PENDING_SYNC, pending).apply()
+    }
+
     fun save(preferences: NotificationPreferences) {
         this.preferences.edit()
             .putBoolean(KEY_TICKET_STATUS, preferences.ticketStatus)
@@ -38,5 +44,6 @@ class NotificationStore(context: Context) {
         const val KEY_TICKET_STATUS = "ticket_status"
         const val KEY_AREA_EMERGENCIES = "area_emergencies"
         const val KEY_MARKETING = "marketing_news"
+        const val KEY_PENDING_SYNC = "pending_sync"
     }
 }
