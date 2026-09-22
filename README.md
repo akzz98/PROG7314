@@ -106,6 +106,8 @@ Settings includes a POPIA-style privacy note: name, email, ward, location, and p
 
 Settings opens Profile. That screen shows the name, masked email, default ward, language, and role. Impact score and badges are marked **Coming in Final POE** and are not shown.
 
+Home opens **Report**. That step explains why a photo is needed, then asks for the camera and gallery. Denying either permission stays on the screen and does not close the app. Logcat records granted or denied, never a token.
+
 Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
 
 `Firebase:ProjectId` in `appsettings.json` must match the Firebase project (`munipulse-987ce`). The API still needs `Jwt:SigningKey` in user-secrets before it can issue a session.

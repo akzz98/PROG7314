@@ -13,6 +13,7 @@ import kotlinx.coroutines.delay
 import za.co.munipulse.auth.GoogleSignInViewModel
 import za.co.munipulse.auth.SignInUiState
 import za.co.munipulse.ui.home.HomeScreen
+import za.co.munipulse.ui.report.MediaAccessScreen
 import za.co.munipulse.ui.login.LoginScreen
 import za.co.munipulse.ui.onboarding.OnboardingScreen
 import za.co.munipulse.ui.settings.NotificationPreferencesScreen
@@ -26,6 +27,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     var showSettings by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
     var showProfile by remember { mutableStateOf(false) }
+    var showReport by remember { mutableStateOf(false) }
     val state by viewModel.state.collectAsState()
     val restoring by viewModel.restoring.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
@@ -52,6 +54,9 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     val current = state
     when {
         showSplash -> SplashScreen()
+        current is SignInUiState.SignedIn && showReport -> MediaAccessScreen(
+            onBack = { showReport = false },
+        )
         current is SignInUiState.SignedIn && showProfile -> ProfileScreen(
             displayName = current.displayName,
             email = current.email,
@@ -77,6 +82,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
                 showSettings = false
                 showNotifications = false
                 showProfile = false
+                showReport = false
                 viewModel.signOut()
             },
             onBack = { showSettings = false },
@@ -85,6 +91,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             displayName = current.displayName,
             email = current.email,
             sessionNote = current.sessionNote,
+            onOpenReport = { showReport = true },
             onOpenSettings = { showSettings = true },
         )
         !onboardingDone -> OnboardingScreen(onContinue = viewModel::finishOnboarding)

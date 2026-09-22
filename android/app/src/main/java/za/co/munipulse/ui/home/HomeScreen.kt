@@ -22,6 +22,7 @@ fun HomeScreen(
     displayName: String,
     email: String,
     sessionNote: String,
+    onOpenReport: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -41,6 +42,10 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = sessionNote, style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onOpenReport, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(R.string.home_report))
+        }
+        Spacer(modifier = Modifier.height(8.dp))
         Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
             Text(text = stringResource(R.string.home_settings))
         }
