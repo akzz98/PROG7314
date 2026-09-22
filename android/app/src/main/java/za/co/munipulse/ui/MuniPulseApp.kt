@@ -13,7 +13,7 @@ import kotlinx.coroutines.delay
 import za.co.munipulse.auth.GoogleSignInViewModel
 import za.co.munipulse.auth.SignInUiState
 import za.co.munipulse.ui.home.HomeScreen
-import za.co.munipulse.ui.report.MediaAccessScreen
+import za.co.munipulse.ui.report.CreateIncidentScreen
 import za.co.munipulse.ui.login.LoginScreen
 import za.co.munipulse.ui.onboarding.OnboardingScreen
 import za.co.munipulse.ui.settings.NotificationPreferencesScreen
@@ -54,7 +54,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     val current = state
     when {
         showSplash -> SplashScreen()
-        current is SignInUiState.SignedIn && showReport -> MediaAccessScreen(
+        current is SignInUiState.SignedIn && showReport -> CreateIncidentScreen(
             onBack = { showReport = false },
         )
         current is SignInUiState.SignedIn && showProfile -> ProfileScreen(

@@ -106,7 +106,7 @@ Settings includes a POPIA-style privacy note: name, email, ward, location, and p
 
 Settings opens Profile. That screen shows the name, masked email, default ward, language, and role. Impact score and badges are marked **Coming in Final POE** and are not shown.
 
-Home opens **Report**. That step explains why a photo is needed, then asks for the camera and gallery. It also explains why location is needed, then reads latitude, longitude, and accuracy. Denying any of these stays on the screen and does not close the app. Logcat records granted or denied, and the accuracy in metres. It does not record the coordinates or a token.
+Home opens **New incident**. The form has a category (pothole, water leak, illegal dumping, streetlight, sewage, or other), a description, up to three photo previews from the camera or gallery, and a GPS line with **Refresh GPS**. Denying camera, gallery, or location stays on the screen and does not close the app. **Submit report** does not send the incident yet. Logcat records permission results and the accuracy in metres. It does not record the coordinates, the description, or a token.
 
 Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
 
