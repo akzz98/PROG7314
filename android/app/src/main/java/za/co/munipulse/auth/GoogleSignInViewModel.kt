@@ -35,6 +35,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
 
     private val sessionStore = SessionStore(application)
     private val onboardingStore = OnboardingStore(application)
+    private val notificationStore = NotificationStore(application)
     private var accessToken: String? = null
 
     private val _restoring = MutableStateFlow(false)
@@ -42,6 +43,14 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
 
     private val _onboardingComplete = MutableStateFlow(onboardingStore.isComplete())
     val onboardingComplete: StateFlow<Boolean> = _onboardingComplete.asStateFlow()
+
+    private val _notifications = MutableStateFlow(notificationStore.read())
+    val notifications: StateFlow<NotificationPreferences> = _notifications.asStateFlow()
+
+    fun updateNotifications(preferences: NotificationPreferences) {
+        notificationStore.save(preferences)
+        _notifications.value = preferences
+    }
 
     fun finishOnboarding() {
         if (_onboardingComplete.value) {

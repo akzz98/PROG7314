@@ -15,6 +15,7 @@ import za.co.munipulse.auth.SignInUiState
 import za.co.munipulse.ui.home.HomeScreen
 import za.co.munipulse.ui.login.LoginScreen
 import za.co.munipulse.ui.onboarding.OnboardingScreen
+import za.co.munipulse.ui.settings.NotificationPreferencesScreen
 import za.co.munipulse.ui.settings.SettingsScreen
 import za.co.munipulse.ui.splash.SplashScreen
 
@@ -22,8 +23,10 @@ import za.co.munipulse.ui.splash.SplashScreen
 fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     var splashHold by remember { mutableStateOf(true) }
     var showSettings by remember { mutableStateOf(false) }
+    var showNotifications by remember { mutableStateOf(false) }
     val state by viewModel.state.collectAsState()
     val restoring by viewModel.restoring.collectAsState()
+    val notifications by viewModel.notifications.collectAsState()
     val onboardingDone by viewModel.onboardingComplete.collectAsState()
     val showSplash = splashHold || state is SignInUiState.Checking || restoring
 
@@ -47,13 +50,20 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     val current = state
     when {
         showSplash -> SplashScreen()
+        current is SignInUiState.SignedIn && showNotifications -> NotificationPreferencesScreen(
+            preferences = notifications,
+            onChange = viewModel::updateNotifications,
+            onBack = { showNotifications = false },
+        )
         current is SignInUiState.SignedIn && showSettings -> SettingsScreen(
             displayName = current.displayName,
             email = current.email,
             defaultWardCode = current.defaultWardCode,
             onWardSelected = viewModel::updateDefaultWard,
+            onOpenNotifications = { showNotifications = true },
             onSignOut = {
                 showSettings = false
+                showNotifications = false
                 viewModel.signOut()
             },
             onBack = { showSettings = false },

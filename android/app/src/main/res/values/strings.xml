@@ -15,6 +15,12 @@
     <string name="settings_account">Account</string>
     <string name="settings_ward">Default ward</string>
     <string name="settings_ward_value">%1$s · %2$s %3$s</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_local_note">Saved on this device. Push alerts are not sent.</string>
+    <string name="notifications_ticket_status">Ticket status</string>
+    <string name="notifications_area_emergencies">Area emergencies</string>
+    <string name="notifications_marketing">Marketing and news</string>
     <string name="onboarding_page1_title">Report with photo + GPS</string>
     <string name="onboarding_page1_body">Add a photo and your location when you report a problem in the ward.</string>
     <string name="onboarding_page2_title">Crowd-rank ward urgency</string>

@@ -37,6 +37,7 @@ fun SettingsScreen(
     email: String,
     defaultWardCode: String,
     onWardSelected: (String) -> Unit,
+    onOpenNotifications: () -> Unit,
     onSignOut: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -99,6 +100,10 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedButton(onClick = onOpenNotifications, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(R.string.settings_notifications))
         }
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {

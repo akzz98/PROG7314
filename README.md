@@ -96,6 +96,8 @@ Cold start stays on the splash while that session is checked. A valid session op
 
 Home opens Settings. That screen shows the display name, a masked email, and the default ward (JHB-23, JHB-24, CPT-11, DBN-07, TSH-04). The ward choice is stored with the session on the device. Sign out is on Settings.
 
+Settings opens notification preferences: ticket status and area emergencies start on, and marketing and news start off. Those three choices stay on the device. Push delivery is Final POE and is not implemented.
+
 Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
 
 `Firebase:ProjectId` in `appsettings.json` must match the Firebase project (`munipulse-987ce`). The API still needs `Jwt:SigningKey` in user-secrets before it can issue a session.
