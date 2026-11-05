@@ -25,36 +25,60 @@ public class SyncPushTests
         Assert.Null(ApiEndpoints.PushConflictCode(Valid()));
         Assert.Equal("UNKNOWN_MUTATION", ApiEndpoints.PushConflictCode(Valid(mutationType: "renameIncident")));
         Assert.Equal("VALIDATION_ERROR", ApiEndpoints.PushConflictCode(Valid(clientMutationId: "")));
+        Assert.Equal("VALIDATION_ERROR", ApiEndpoints.PushConflictCode(Valid(category: "Hole")));
+    }
+
+    [Fact]
+    public void AcceptsAnEditWithAnIncidentAndDescription()
+    {
+        Assert.Null(ApiEndpoints.PushConflictCode(Edit()));
+        Assert.Equal("VALIDATION_ERROR", ApiEndpoints.PushConflictCode(Edit(incidentId: "")));
+        Assert.Equal("VALIDATION_ERROR", ApiEndpoints.PushConflictCode(Edit(description: "too short")));
+        Assert.Equal("VALIDATION_ERROR", ApiEndpoints.PushConflictCode(Edit(clientMutationId: "")));
     }
 
     [Fact]
     public void KeepsAResolvedReportUnchanged()
     {
-        var edit = new SyncOperationRequest
-        {
-            ClientMutationId = "device-uuid-1",
-            MutationType = "editIncident",
-            IncidentId = "6500inc001",
-            Description = "A deep hole in the road",
-        };
-
-        Assert.Null(ApiEndpoints.PushConflictCode(edit));
         Assert.Equal("RESOLVED", ApiEndpoints.ResolvedEditCode("Resolved"));
         Assert.Null(ApiEndpoints.ResolvedEditCode("InProgress"));
         Assert.Null(ApiEndpoints.ResolvedEditCode("Submitted"));
+        Assert.Null(ApiEndpoints.ResolvedEditCode(null));
     }
 
-    private static SyncOperationRequest Valid(string mutationType = "createIncident", string clientMutationId = "device-uuid-1") =>
+    [Fact]
+    public void NamesAckAndConflictResults()
+    {
+        Assert.Equal("ack", SyncResults.Ack);
+        Assert.Equal("conflict", SyncResults.Conflict);
+    }
+
+    private static SyncOperationRequest Valid(
+        string mutationType = "createIncident",
+        string clientMutationId = "device-uuid-1",
+        string category = "Pothole") =>
         new()
         {
             ClientMutationId = clientMutationId,
             MutationType = mutationType,
-            Category = "Pothole",
+            Category = category,
             Description = "A deep hole in the road",
             Latitude = -26.2,
             Longitude = 28.04,
             AccuracyMeters = 8,
             WardCode = "JHB-23",
             PhotoIds = [],
+        };
+
+    private static SyncOperationRequest Edit(
+        string clientMutationId = "device-uuid-1",
+        string incidentId = "6500inc001",
+        string description = "A deep hole in the road") =>
+        new()
+        {
+            ClientMutationId = clientMutationId,
+            MutationType = "editIncident",
+            IncidentId = incidentId,
+            Description = description,
         };
 }

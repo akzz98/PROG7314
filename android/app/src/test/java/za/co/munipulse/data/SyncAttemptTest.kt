@@ -22,23 +22,47 @@ class SyncAttemptTest {
     }
 
     @Test
-    fun leavesAFinishedRowAlone() {
-        val original = row(status = SyncStatus.ACK, retryCount = 3)
-        val updated = SyncAttempt.retry(original, online = false)
+    fun leavesAckAndConflictRowsAloneOnRetry() {
+        val acked = row(status = SyncStatus.ACK, retryCount = 3)
+        val conflict = row(status = SyncStatus.CONFLICT, retryCount = 2)
 
-        assertEquals(original, updated)
+        assertEquals(acked, SyncAttempt.retry(acked, online = false))
+        assertEquals(conflict, SyncAttempt.retry(conflict, online = true))
     }
 
     @Test
-    fun marksAnAckAndAConflict() {
-        val pending = row()
-        val acked = SyncAttempt.apply(pending, "ack", null)
-        val duplicate = SyncAttempt.apply(pending, "conflict", "DUPLICATE_MUTATION")
+    fun movesPendingToAckOnASuccessfulPush() {
+        val updated = SyncAttempt.apply(row(), "ack", null)
 
-        assertEquals(SyncStatus.ACK, acked.status)
-        assertEquals(null, acked.lastError)
-        assertEquals(SyncStatus.ACK, duplicate.status)
-        assertEquals(null, duplicate.lastError)
+        assertEquals(SyncStatus.ACK, updated.status)
+        assertEquals(null, updated.lastError)
+        assertEquals(0, updated.retryCount)
+    }
+
+    @Test
+    fun movesPendingToAckWhenTheMutationWasAlreadyStored() {
+        val updated = SyncAttempt.apply(row(), "conflict", "DUPLICATE_MUTATION")
+
+        assertEquals(SyncStatus.ACK, updated.status)
+        assertEquals(null, updated.lastError)
+    }
+
+    @Test
+    fun movesPendingToConflictForAResolvedEdit() {
+        val updated = SyncAttempt.apply(row(), "conflict", SyncAttempt.RESOLVED)
+
+        assertEquals(SyncStatus.CONFLICT, updated.status)
+        assertEquals(SyncAttempt.RESOLVED, updated.lastError)
+        assertEquals(SyncStatus.PENDING, row().status)
+    }
+
+    @Test
+    fun leavesAnUnknownResultPending() {
+        val pending = row(retryCount = 4)
+        val updated = SyncAttempt.apply(pending, "unknown", null)
+
+        assertEquals(pending, updated)
+        assertEquals(SyncStatus.PENDING, updated.status)
     }
 
     private fun row(
