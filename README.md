@@ -47,7 +47,7 @@ flowchart TB
 
 Part 2 includes Google SSO, Settings, the custom API and database, and custom features UD-1 (photo + GPS), UD-2 (upvotes and ward aggregation), and UD-3 (resolution timeline).
 
-Final POE still to come: Room offline sync, FCM, the emergency map (UD-4), and impact scores (UD-5). English, isiZulu, biometric unlock, and Azure Blob photos are in this build.
+Final POE still to come: offline sync, FCM, the emergency map (UD-4), and impact scores (UD-5). English, isiZulu, biometric unlock, Azure Blob photos, and the Room database are in this build. The Room database holds the pending-sync table and a settings mirror. It does not queue reports yet.
 
 ## Layout
 

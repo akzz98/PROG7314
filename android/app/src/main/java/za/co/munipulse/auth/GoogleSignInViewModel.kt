@@ -16,6 +16,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import za.co.munipulse.R
+import za.co.munipulse.data.LocalSettingsMirror
 import za.co.munipulse.report.IncidentDraft
 import za.co.munipulse.report.IncidentSubmitResult
 import za.co.munipulse.report.IncidentValidator
@@ -61,6 +62,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private val sessionStore = SessionStore(application)
     private val appLanguage = AppLanguage(application)
     private val biometricStore = BiometricStore(application)
+    private val settingsMirror = LocalSettingsMirror(application)
     private val onboardingStore = OnboardingStore(application)
     private val notificationStore = NotificationStore(application)
     private val _appliedLanguage = MutableStateFlow(appLanguage.read())
@@ -111,6 +113,10 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private val _upvoteBusy = MutableStateFlow(false)
     val upvoteBusy: StateFlow<Boolean> = _upvoteBusy.asStateFlow()
     private var upvoteInFlight = false
+
+    init {
+        mirrorSettings()
+    }
 
     fun updateNotifications(preferences: NotificationPreferences) {
         notificationStore.save(preferences)
@@ -215,6 +221,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         if (!enabled) {
             biometricStore.save(false)
             _biometricEnabled.value = false
+            mirrorSettings()
             Log.i(TAG, "Biometric unlock off")
             return null
         }
@@ -231,6 +238,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 biometricStore.save(true)
                 _biometricEnabled.value = true
                 _biometricUnlocked.value = true
+                mirrorSettings()
                 Log.i(TAG, "Biometric unlock on")
                 null
             }
@@ -905,6 +913,16 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             role = role.ifBlank { "Citizen" },
         )
 
+    private fun mirrorSettings() {
+        viewModelScope.launch {
+            try {
+                settingsMirror.refresh()
+            } catch (error: Exception) {
+                Log.e(TAG, "Settings mirror failed: ${error.javaClass.simpleName}")
+            }
+        }
+    }
+
     private fun persistLanguage(code: String): String {
         val next = LanguageCodes.normalize(code)
         sessionStore.updateLanguage(next)
@@ -912,6 +930,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             Log.i(TAG, "Preferred language set to $next")
             _appliedLanguage.value = next
         }
+        mirrorSettings()
         return next
     }
 

@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -58,6 +59,8 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.fragment)
     implementation(libs.androidx.biometric)
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
