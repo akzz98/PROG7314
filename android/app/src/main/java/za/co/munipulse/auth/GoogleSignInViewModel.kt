@@ -16,7 +16,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import za.co.munipulse.R
+import za.co.munipulse.data.DeviceNetwork
 import za.co.munipulse.data.LocalSettingsMirror
+import za.co.munipulse.data.MuniPulseDatabase
+import za.co.munipulse.data.QueuedIncident
+import za.co.munipulse.data.QueuedPhotos
 import za.co.munipulse.report.IncidentDraft
 import za.co.munipulse.report.IncidentSubmitResult
 import za.co.munipulse.report.IncidentValidator
@@ -846,6 +850,9 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             Log.i(TAG, "Create form rejected. Fields ${errors.keys.joinToString(",")}")
             return failed(R.string.validation_summary)
         }
+        if (!DeviceNetwork.isOnline(getApplication())) {
+            return queueOffline(draft, photos, mutationId)
+        }
         val jpeg = mutableListOf<ByteArray>()
         for (uri in photos) {
             val bytes = PhotoFiles.jpegBytes(getApplication(), uri) ?: return failed(R.string.report_photo_failed)
@@ -890,6 +897,25 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 else -> R.string.report_send_failed
             }
             failed(message)
+        }
+    }
+
+    private suspend fun queueOffline(
+        draft: IncidentDraft,
+        photos: List<Uri>,
+        mutationId: String,
+    ): IncidentSubmitResult {
+        return try {
+            val paths = QueuedPhotos.store(getApplication(), mutationId, photos)
+                ?: return failed(R.string.report_photo_failed)
+            val operation = QueuedIncident.operation(draft, mutationId, paths, System.currentTimeMillis())
+                ?: return failed(R.string.validation_summary)
+            MuniPulseDatabase.get(getApplication()).pendingSync().upsert(operation)
+            Log.i(TAG, "Incident queued ${operation.id}. Photos ${paths.size}. Status ${operation.status}")
+            IncidentSubmitResult.Queued
+        } catch (error: Exception) {
+            Log.e(TAG, "Incident queue failed: ${error.javaClass.simpleName}")
+            failed(R.string.report_send_failed)
         }
     }
 

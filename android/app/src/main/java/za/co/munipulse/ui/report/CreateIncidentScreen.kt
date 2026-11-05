@@ -397,6 +397,11 @@ fun CreateIncidentScreen(
                             submitFailed = false
                             submitNote = context.getString(R.string.report_duplicate)
                         }
+                        IncidentSubmitResult.Queued -> {
+                            formAccepted = true
+                            submitFailed = false
+                            submitNote = context.getString(R.string.report_queued)
+                        }
                         is IncidentSubmitResult.Failed -> {
                             formAccepted = false
                             submitFailed = true

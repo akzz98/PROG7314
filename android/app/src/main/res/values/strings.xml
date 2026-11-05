@@ -104,6 +104,7 @@
     <string name="report_valid">The form is valid. This report is not sent yet.</string>
     <string name="report_sending">Sending report…</string>
     <string name="report_saved">Report saved. %1$s</string>
+    <string name="report_queued">Queued on this phone. It will send when you are back online.</string>
     <string name="report_duplicate">This report was already submitted.</string>
     <string name="report_send_failed">The report was not sent. Try again.</string>
     <string name="report_photo_failed">A photo could not be prepared.</string>
