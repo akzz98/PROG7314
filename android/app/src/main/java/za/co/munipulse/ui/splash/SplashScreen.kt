@@ -15,10 +15,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import za.co.munipulse.R
 import za.co.munipulse.ui.theme.MuniPulseTheme
 import za.co.munipulse.ui.theme.PulseTeal
 
@@ -34,12 +36,12 @@ fun SplashScreen(modifier: Modifier = Modifier) {
         PulseMark()
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "MuniPulse SA",
+            text = stringResource(R.string.app_name),
             style = MaterialTheme.typography.headlineMedium,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Checking session…",
+            text = stringResource(R.string.splash_status),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -48,10 +50,11 @@ fun SplashScreen(modifier: Modifier = Modifier) {
 
 @Composable
 private fun PulseMark() {
+    val mark = stringResource(R.string.splash_mark)
     Canvas(
         modifier = Modifier
             .size(96.dp)
-            .semantics { contentDescription = "MuniPulse pulse mark" },
+            .semantics { contentDescription = mark },
     ) {
         val center = Offset(size.width / 2f, size.height / 2f)
         drawCircle(

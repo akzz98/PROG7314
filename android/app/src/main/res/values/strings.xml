@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MuniPulse SA</string>
+    <string name="splash_status">Checking session…</string>
+    <string name="splash_mark">MuniPulse pulse mark</string>
     <string name="login_subtitle">Civic reporting for your ward</string>
     <string name="login_google">Continue with Google</string>
     <string name="login_working">Contacting Google…</string>
@@ -128,6 +130,8 @@
     <string name="settings_profile">Profile</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_language">Language</string>
+    <string name="language_title">Language / Ulimi</string>
+    <string name="language_save">Save</string>
     <string name="settings_biometric">Biometric unlock</string>
     <string name="settings_sync">Sync centre</string>
     <string name="settings_final_poe">Coming in Final POE</string>
@@ -135,6 +139,7 @@
     <string name="profile_name">Name</string>
     <string name="profile_email">Email</string>
     <string name="profile_language">Language</string>
+    <string name="account_google">Google account</string>
     <string name="profile_language_en">English</string>
     <string name="profile_language_zu">isiZulu</string>
     <string name="profile_role">Role</string>
@@ -159,4 +164,6 @@
     <string name="session_failed">Google sign-in worked, but the API session did not. Check that the API is running.</string>
     <string name="profile_sync_failed">Saved on this device. The profile could not be updated online.</string>
     <string name="sign_out">Sign out</string>
+    <string name="time_today">today</string>
+    <string name="time_yesterday">yesterday</string>
 </resources>

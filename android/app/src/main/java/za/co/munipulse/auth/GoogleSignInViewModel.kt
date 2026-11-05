@@ -51,13 +51,18 @@ sealed interface SignInUiState {
     data object MissingWebClient : SignInUiState
 }
 
+internal const val FALLBACK_DISPLAY_NAME = "Google account"
+
 class GoogleSignInViewModel(application: Application) : AndroidViewModel(application) {
     private val _state = MutableStateFlow<SignInUiState>(SignInUiState.Checking)
     val state: StateFlow<SignInUiState> = _state.asStateFlow()
 
     private val sessionStore = SessionStore(application)
+    private val appLanguage = AppLanguage(application)
     private val onboardingStore = OnboardingStore(application)
     private val notificationStore = NotificationStore(application)
+    private val _appliedLanguage = MutableStateFlow(appLanguage.read())
+    val appliedLanguage: StateFlow<String> = _appliedLanguage.asStateFlow()
     private var accessToken: String? = null
     private val profileMutex = Mutex()
 
@@ -146,7 +151,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 stored.email.ifBlank { user.email },
                 context.getString(R.string.session_ready),
                 stored.defaultWardCode,
-                preferredLanguage = sessionStore.readLanguage() ?: "en",
+                preferredLanguage = persistLanguage(sessionStore.readLanguage() ?: appLanguage.read()),
             )
             requestProfileSync(pushLocal = false)
             return
@@ -181,6 +186,19 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 requestProfileSync(pushLocal = false)
             }
         }
+    }
+
+    fun updatePreferredLanguage(code: String): Boolean {
+        val current = _state.value as? SignInUiState.SignedIn ?: return false
+        val next = LanguageCodes.normalize(code)
+        if (current.preferredLanguage == next && appLanguage.read() == next) {
+            return false
+        }
+        persistLanguage(next)
+        _state.value = current.copy(preferredLanguage = next, profileNote = "")
+        notificationStore.setPendingSync(true)
+        requestProfileSync(pushLocal = true)
+        return true
     }
 
     fun updateDefaultWard(code: String) {
@@ -611,26 +629,31 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
 
     private suspend fun sessionState(user: FirebaseUser): SignInUiState {
         var ward = WardCatalog.DEFAULT
-        var language = sessionStore.readLanguage() ?: "en"
+        var language = appLanguage.read()
         var role = "Citizen"
         val note = try {
             val idToken = user.getIdToken(false).await().token
                 ?: throw SessionExchangeException("Firebase did not return an ID token.")
             val session = SessionClient.exchange(idToken)
             accessToken = session.accessToken
-            val name = user.displayName?.takeIf { it.isNotBlank() } ?: "Google account"
+            val name = user.displayName?.takeIf { it.isNotBlank() } ?: FALLBACK_DISPLAY_NAME
             val email = user.email.orEmpty()
             val serverWard = WardCatalog.normalize(session.user.defaultWardCode)
             val pending = notificationStore.isPendingSync()
             ward = if (pending) sessionStore.read()?.defaultWardCode ?: serverWard else serverWard
-            sessionStore.save(session, name, email, ward)
-            role = session.user.roles?.firstOrNull { it.isNotBlank() } ?: "Citizen"
             if (!pending) {
                 val serverLanguage = session.user.preferredLanguage
-                if (serverLanguage == "en" || serverLanguage == "zu") {
-                    sessionStore.updateLanguage(serverLanguage)
-                    language = serverLanguage
+                if (serverLanguage == LanguageCodes.ENGLISH || serverLanguage == LanguageCodes.ZULU) {
+                    language = LanguageCodes.normalize(serverLanguage)
                 }
+            }
+            sessionStore.save(session, name, email, ward, language)
+            if (appLanguage.save(language)) {
+                Log.i(TAG, "Preferred language set to $language")
+                _appliedLanguage.value = language
+            }
+            role = session.user.roles?.firstOrNull { it.isNotBlank() } ?: "Citizen"
+            if (!pending) {
                 applyRemoteNotifications(session.user.notifications)
             }
             Log.i(TAG, "API session issued for user ${session.user.id}")
@@ -685,7 +708,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         val notes = _notifications.value
         return PatchMeBody(
             defaultWardCode = ward,
-            preferredLanguage = sessionStore.readLanguage(),
+            preferredLanguage = sessionStore.readLanguage() ?: appLanguage.read(),
             notifications = ApiNotifications(notes.ticketStatus, notes.areaEmergencies),
         )
     }
@@ -693,7 +716,12 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private fun applyRemote(profile: UserProfileDto) {
         val ward = WardCatalog.normalize(profile.defaultWardCode)
         sessionStore.updateWard(ward)
-        profile.preferredLanguage?.let(sessionStore::updateLanguage)
+        val localLanguage = sessionStore.readLanguage() ?: appLanguage.read()
+        val language = if (notificationStore.isPendingSync()) {
+            persistLanguage(localLanguage)
+        } else {
+            persistLanguage(profile.preferredLanguage ?: localLanguage)
+        }
         applyRemoteNotifications(profile.notifications)
         notificationStore.setPendingSync(false)
         val current = _state.value as? SignInUiState.SignedIn
@@ -703,8 +731,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 email = profile.email?.takeIf { it.isNotBlank() } ?: current.email,
                 defaultWardCode = ward,
                 profileNote = "",
-                preferredLanguage = profile.preferredLanguage?.takeIf { it == "en" || it == "zu" }
-                    ?: current.preferredLanguage,
+                preferredLanguage = language,
                 role = profile.roles?.firstOrNull { it.isNotBlank() } ?: current.role,
             )
         }
@@ -800,13 +827,23 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         role: String = "Citizen",
     ): SignInUiState.SignedIn =
         SignInUiState.SignedIn(
-            displayName = displayName?.takeIf { it.isNotBlank() } ?: "Google account",
+            displayName = displayName?.takeIf { it.isNotBlank() } ?: FALLBACK_DISPLAY_NAME,
             email = email?.takeIf { it.isNotBlank() } ?: "",
             sessionNote = sessionNote,
             defaultWardCode = WardCatalog.normalize(defaultWardCode),
-            preferredLanguage = if (preferredLanguage == "zu") "zu" else "en",
+            preferredLanguage = LanguageCodes.normalize(preferredLanguage),
             role = role.ifBlank { "Citizen" },
         )
+
+    private fun persistLanguage(code: String): String {
+        val next = LanguageCodes.normalize(code)
+        sessionStore.updateLanguage(next)
+        if (appLanguage.save(next)) {
+            Log.i(TAG, "Preferred language set to $next")
+            _appliedLanguage.value = next
+        }
+        return next
+    }
 
     private companion object {
         const val TAG = "MuniPulseAuth"

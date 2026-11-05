@@ -16,6 +16,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.tasks.await
+import za.co.munipulse.R
 
 // Google sign-in through Credential Manager, then Firebase Auth.
 // https://firebase.google.com/docs/auth/android/google-signin
@@ -89,7 +90,11 @@ object GoogleSignIn {
     fun hasWebClient(context: Context): Boolean = webClientId(context) != null
 
     private fun webClientId(context: Context): String? {
-        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+        // The install id is com.munipulse. Merged resources, including the Web client
+        // string from google-services.json, live under the namespace za.co.munipulse.
+        // A lookup with context.packageName returns 0 and leaves Continue with Google disabled.
+        val resourcePackage = context.resources.getResourcePackageName(R.string.app_name)
+        val resId = context.resources.getIdentifier("default_web_client_id", "string", resourcePackage)
         if (resId == 0) {
             return null
         }

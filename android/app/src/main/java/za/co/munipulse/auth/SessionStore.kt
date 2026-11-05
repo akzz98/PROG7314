@@ -16,7 +16,13 @@ class SessionStore(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
 
-    fun save(session: SessionResponse, displayName: String, email: String, defaultWardCode: String) {
+    fun save(
+        session: SessionResponse,
+        displayName: String,
+        email: String,
+        defaultWardCode: String,
+        language: String,
+    ) {
         val expiresAt = System.currentTimeMillis() + session.expiresIn * 1000L
         preferences.edit()
             .putString(KEY_TOKEN, session.accessToken)
@@ -25,6 +31,7 @@ class SessionStore(context: Context) {
             .putString(KEY_DISPLAY_NAME, displayName)
             .putString(KEY_EMAIL, email)
             .putString(KEY_WARD, WardCatalog.normalize(defaultWardCode))
+            .putString(KEY_LANGUAGE, LanguageCodes.normalize(language))
             .apply()
         Log.i(TAG, "Stored API session for user ${session.user.id}")
     }

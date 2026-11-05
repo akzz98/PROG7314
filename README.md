@@ -47,7 +47,7 @@ flowchart TB
 
 Part 2 includes Google SSO, Settings, the custom API and database, and custom features UD-1 (photo + GPS), UD-2 (upvotes and ward aggregation), and UD-3 (resolution timeline).
 
-Final POE is not in this build: biometric unlock, Room offline sync, FCM, full English and isiZulu localisation, Azure Blob, the emergency map (UD-4), and impact scores (UD-5).
+Final POE still to come: biometric unlock, Room offline sync, FCM, Azure Blob, the emergency map (UD-4), and impact scores (UD-5). English and isiZulu are in this build.
 
 ## Layout
 
@@ -192,11 +192,11 @@ Cold start stays on the splash while that session is checked. A valid session op
 
 Home is the ward pulse. It shows the default ward, a count of open incidents in that ward, and each open report as a category, a short place line, and an upvote count. **Report** is on that screen, so a signed-in person reaches it in one tap. The ward menu uses the same five demo wards. The bell opens notification preferences and the profile icon opens Profile. The bottom bar has Home, My, Map, and Settings. Map stays on the bar, stays disabled, and is labelled Final POE. It does not open a screen. **Ward hotspots** opens from Home and calls `GET /api/v1/incidents/aggregates`. Each row is one server group: same ward, same category, within 250 metres, and reported in the last 14 days. The row shows the report count and the upvote total, and opens the highest-voted report in that group. A grouped report says so on its detail screen. **My** lists this account's reports from `GET /api/v1/incidents?scope=mine`, with a filter for all, submitted, in progress, or resolved. An empty ward list, an empty My list, and a failed load each explain what happened. Empty lists offer **Report**. A failed load offers **Retry**. A row on Home or My opens the incident: status, description, photos, upvote count, and the timeline from oldest to newest. Each event shows the type, time, role, and note. **Refresh** loads that incident again, so a milestone posted while the screen is open appears without leaving the page. **Upvote** adds one vote for the signed-in person. The count and **You upvoted** show on the detail screen, the ward pulse, and My incidents. A second vote returns `409 ALREADY_UPVOTED` and does not increase the count. Creating a report already counts as that person's vote. The live map is not on that screen yet. The pulse calls `GET /api/v1/incidents?scope=ward`. Detail calls `GET /api/v1/incidents/{id}`. Logcat records the ward code and how many open incidents loaded, or an error code. It does not record coordinates or the description. Settings, opened from that bar, shows the display name, a masked email, and the default ward (JHB-23, JHB-24, CPT-11, DBN-07, TSH-04). Sign out is on Settings.
 
-When a session exists, the app calls `GET /api/v1/me`. Changing the ward or ticket-status and area-emergency switches calls `PATCH /api/v1/me`. Marketing and news stay on the device and are not sent. If the API is unreachable, the change stays local and Settings says so. The next successful sync sends that change. Preferred language is read and written with the profile (`en` or `zu`) and is not shown as its own screen yet.
+When a session exists, the app calls `GET /api/v1/me`. Changing the ward or ticket-status and area-emergency switches calls `PATCH /api/v1/me`. Marketing and news stay on the device and are not sent. If the API is unreachable, the change stays local and Settings says so. The next successful sync sends that change. Preferred language is English or isiZulu. Settings opens a language screen, saves `en` or `zu` with `PATCH /api/v1/me`, and the open screens switch without reinstalling the app.
 
 Settings opens notification preferences: ticket status and area emergencies start on, and marketing and news start off. Those three choices stay on the device. Push delivery is Final POE and is not implemented.
 
-Language, biometric unlock, and the sync centre are visible on Settings and marked **Coming in Final POE**. They do not open a language picker, a fingerprint prompt, or an offline queue.
+Language opens from Settings and switches the app between English and isiZulu. Biometric unlock and the sync centre stay visible and marked **Coming in Final POE**. They do not open a fingerprint prompt or an offline queue.
 
 Settings includes a POPIA-style privacy note: name, email, ward, location, and photos are kept only for this demo, and location and photos are used to report a fault.
 

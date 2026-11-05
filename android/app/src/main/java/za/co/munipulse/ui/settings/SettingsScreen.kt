@@ -32,6 +32,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import za.co.munipulse.R
+import za.co.munipulse.auth.FALLBACK_DISPLAY_NAME
+import za.co.munipulse.auth.LanguageCodes
 import za.co.munipulse.auth.WardCatalog
 
 @Composable
@@ -40,8 +42,10 @@ fun SettingsScreen(
     email: String,
     defaultWardCode: String,
     profileNote: String,
+    preferredLanguage: String,
     onOpenProfile: () -> Unit,
     onWardSelected: (String) -> Unit,
+    onOpenLanguage: () -> Unit,
     onOpenNotifications: () -> Unit,
     onSignOut: () -> Unit,
     onBack: () -> Unit,
@@ -69,7 +73,7 @@ fun SettingsScreen(
         Text(text = stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = stringResource(R.string.settings_account), style = MaterialTheme.typography.titleMedium)
-        Text(text = displayName, style = MaterialTheme.typography.bodyLarge)
+        Text(text = accountName(displayName), style = MaterialTheme.typography.bodyLarge)
         if (email.isNotEmpty()) {
             Text(text = maskEmail(email), style = MaterialTheme.typography.bodyLarge)
         }
@@ -117,9 +121,19 @@ fun SettingsScreen(
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
-        FinalPoeRow(
-            title = stringResource(R.string.settings_language),
-            detail = stringResource(R.string.settings_final_poe),
+        OutlinedButton(onClick = onOpenLanguage, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(R.string.settings_language))
+        }
+        Text(
+            text = stringResource(
+                if (preferredLanguage == LanguageCodes.ZULU) {
+                    R.string.profile_language_zu
+                } else {
+                    R.string.profile_language_en
+                },
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedButton(onClick = onOpenNotifications, modifier = Modifier.fillMaxWidth()) {
             Text(text = stringResource(R.string.settings_notifications))
@@ -146,7 +160,7 @@ fun SettingsScreen(
     }
 }
 
-// FINAL POE: S10 language, S12 biometric unlock, and S13 sync centre stay closed in Part 2.
+// FINAL POE: S12 biometric unlock and S13 sync centre stay closed until those milestones.
 @Composable
 private fun FinalPoeRow(title: String, detail: String) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -176,6 +190,22 @@ private fun FinalPoeSwitchRow(title: String, detail: String) {
         }
         Switch(checked = false, onCheckedChange = null, enabled = false)
     }
+}
+
+@Composable
+internal fun accountName(displayName: String): String =
+    if (displayName.isBlank() || displayName == FALLBACK_DISPLAY_NAME) {
+        stringResource(R.string.account_google)
+    } else {
+        displayName
+    }
+
+@Composable
+internal fun roleName(role: String): String = when (role) {
+    "FieldWorker" -> stringResource(R.string.role_field_worker)
+    "WardLead" -> stringResource(R.string.role_ward_lead)
+    "Citizen" -> stringResource(R.string.role_citizen)
+    else -> role
 }
 
 internal fun maskEmail(email: String): String {

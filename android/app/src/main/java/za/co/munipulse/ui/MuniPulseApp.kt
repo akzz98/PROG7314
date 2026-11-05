@@ -1,13 +1,15 @@
 package za.co.munipulse.ui
 
+import android.app.Activity
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import za.co.munipulse.auth.GoogleSignInViewModel
@@ -19,6 +21,7 @@ import za.co.munipulse.ui.incidents.WardHotspotsScreen
 import za.co.munipulse.ui.report.CreateIncidentScreen
 import za.co.munipulse.ui.login.LoginScreen
 import za.co.munipulse.ui.onboarding.OnboardingScreen
+import za.co.munipulse.ui.settings.LanguageScreen
 import za.co.munipulse.ui.settings.NotificationPreferencesScreen
 import za.co.munipulse.ui.settings.ProfileScreen
 import za.co.munipulse.ui.settings.SettingsScreen
@@ -26,14 +29,18 @@ import za.co.munipulse.ui.splash.SplashScreen
 
 @Composable
 fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
-    var splashHold by remember { mutableStateOf(true) }
-    var showSettings by remember { mutableStateOf(false) }
-    var showNotifications by remember { mutableStateOf(false) }
-    var showProfile by remember { mutableStateOf(false) }
-    var showReport by remember { mutableStateOf(false) }
-    var homeTab by remember { mutableStateOf(HomeTab.Pulse) }
-    var detailId by remember { mutableStateOf<String?>(null) }
-    var showHotspots by remember { mutableStateOf(false) }
+    var splashHold by rememberSaveable { mutableStateOf(true) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showLanguage by rememberSaveable { mutableStateOf(false) }
+    var showNotifications by rememberSaveable { mutableStateOf(false) }
+    var showProfile by rememberSaveable { mutableStateOf(false) }
+    var showReport by rememberSaveable { mutableStateOf(false) }
+    var homeTabName by rememberSaveable { mutableStateOf(HomeTab.Pulse.name) }
+    var detailId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showHotspots by rememberSaveable { mutableStateOf(false) }
+    val homeTab = runCatching { HomeTab.valueOf(homeTabName) }.getOrDefault(HomeTab.Pulse)
+    val activity = LocalContext.current as Activity
+    val appliedLanguage by viewModel.appliedLanguage.collectAsState()
     val state by viewModel.state.collectAsState()
     val restoring by viewModel.restoring.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
@@ -50,9 +57,24 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     val showSplash = splashHold || state is SignInUiState.Checking || restoring
 
     LaunchedEffect(Unit) {
-        delay(SPLASH_MILLIS)
-        viewModel.refresh()
+        if (viewModel.state.value is SignInUiState.Checking) {
+            delay(SPLASH_MILLIS)
+            viewModel.refresh()
+        }
         splashHold = false
+    }
+
+    var localeRestart by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(appliedLanguage) {
+        if (localeRestart == appliedLanguage) {
+            return@LaunchedEffect
+        }
+        val locales = activity.resources.configuration.locales
+        val active = if (locales.isEmpty) null else locales[0].language
+        if (active != null && active != appliedLanguage) {
+            localeRestart = appliedLanguage
+            activity.recreate()
+        }
     }
 
     LaunchedEffect(showSplash) {
@@ -88,6 +110,14 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             role = current.role,
             onBack = { showProfile = false },
         )
+        current is SignInUiState.SignedIn && showLanguage -> LanguageScreen(
+            selectedCode = current.preferredLanguage,
+            onSave = { code ->
+                viewModel.updatePreferredLanguage(code)
+                showLanguage = false
+            },
+            onBack = { showLanguage = false },
+        )
         current is SignInUiState.SignedIn && showNotifications -> NotificationPreferencesScreen(
             preferences = notifications,
             onChange = viewModel::updateNotifications,
@@ -98,15 +128,18 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             email = current.email,
             defaultWardCode = current.defaultWardCode,
             profileNote = current.profileNote,
+            preferredLanguage = current.preferredLanguage,
             onOpenProfile = { showProfile = true },
             onWardSelected = viewModel::updateDefaultWard,
+            onOpenLanguage = { showLanguage = true },
             onOpenNotifications = { showNotifications = true },
             onSignOut = {
                 showSettings = false
+                showLanguage = false
                 showNotifications = false
                 showProfile = false
                 showReport = false
-                homeTab = HomeTab.Pulse
+                homeTabName = HomeTab.Pulse.name
                 detailId = null
                 showHotspots = false
                 viewModel.signOut()
@@ -142,7 +175,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             onRefresh = viewModel::refreshWardPulse,
             onWardSelected = viewModel::updateDefaultWard,
             tab = homeTab,
-            onTab = { homeTab = it },
+            onTab = { homeTabName = it.name },
             mine = mine,
             mineStatus = mineStatus,
             onRefreshMine = viewModel::refreshMine,

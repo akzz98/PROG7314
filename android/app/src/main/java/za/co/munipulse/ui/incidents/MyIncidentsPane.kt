@@ -101,7 +101,11 @@ fun MyIncidentsPane(
 @Composable
 private fun MineRow(item: MyIncidentItem, onOpen: () -> Unit) {
     val category = categoryName(item.category)
-    val whenLabel = IncidentTime.whenLabel(item.createdAt)
+    val whenLabel = IncidentTime.whenLabel(
+        item.createdAt,
+        stringResource(R.string.time_today),
+        stringResource(R.string.time_yesterday),
+    )
     val title = if (whenLabel.isBlank()) {
         "${statusLabel(item.status)} · $category"
     } else {

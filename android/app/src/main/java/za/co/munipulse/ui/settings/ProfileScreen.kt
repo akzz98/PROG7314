@@ -52,7 +52,7 @@ fun ProfileScreen(
             Text(text = stringResource(R.string.settings_back))
         }
         Text(text = stringResource(R.string.profile_title), style = MaterialTheme.typography.headlineMedium)
-        ProfileField(label = stringResource(R.string.profile_name), value = displayName)
+        ProfileField(label = stringResource(R.string.profile_name), value = accountName(displayName))
         if (email.isNotEmpty()) {
             ProfileField(label = stringResource(R.string.profile_email), value = maskEmail(email))
         }
@@ -65,7 +65,7 @@ fun ProfileScreen(
             },
         )
         ProfileField(label = stringResource(R.string.profile_language), value = languageLabel)
-        ProfileField(label = stringResource(R.string.profile_role), value = role)
+        ProfileField(label = stringResource(R.string.profile_role), value = roleName(role))
         // FINAL POE: UD-5 impact score and badges are not part of the Part 2 profile.
         Text(
             text = stringResource(R.string.profile_impact),

@@ -69,14 +69,14 @@ data class TimelineLine(
 )
 
 object IncidentTime {
-    fun whenLabel(value: String): String {
+    fun whenLabel(value: String, todayLabel: String, yesterdayLabel: String): String {
         val instant = parse(value) ?: return ""
         val zone = ZoneId.systemDefault()
         val day = instant.atZone(zone).toLocalDate()
         val today = LocalDate.now(zone)
         return when {
-            day == today -> "today"
-            day == today.minusDays(1) -> "yesterday"
+            day == today -> todayLabel
+            day == today.minusDays(1) -> yesterdayLabel
             day.isAfter(today.minusDays(7)) -> day.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault())
             else -> day.format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))
         }
