@@ -158,6 +158,7 @@
     <string name="sync_working">Checking the queue…</string>
     <string name="sync_retry">Retry</string>
     <string name="sync_pending">Pending</string>
+    <string name="sync_empty">Nothing is waiting to send. Offline reports will appear here.</string>
     <string name="sync_row">%1$s · %2$s · retries %3$d</string>
     <string name="sync_status_pending">Queued</string>
     <string name="sync_status_ack">Sent</string>

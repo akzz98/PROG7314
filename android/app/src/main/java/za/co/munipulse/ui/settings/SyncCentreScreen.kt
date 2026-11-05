@@ -99,8 +99,16 @@ private fun SyncCentreBody(
         Text(text = centre.note, style = MaterialTheme.typography.bodyMedium)
     }
     Text(text = stringResource(R.string.sync_pending), style = MaterialTheme.typography.titleMedium)
-    centre.items.forEach { item ->
-        SyncRow(item, enabled = !centre.busy, onRetry = onRetry)
+    if (centre.items.isEmpty()) {
+        Text(
+            text = stringResource(R.string.sync_empty),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else {
+        centre.items.forEach { item ->
+            SyncRow(item, enabled = !centre.busy, onRetry = onRetry)
+        }
     }
 }
 

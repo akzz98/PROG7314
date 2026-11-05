@@ -158,6 +158,7 @@
     <string name="sync_working">Ihlola ulayini…</string>
     <string name="sync_retry">Zama futhi</string>
     <string name="sync_pending">Okulindile</string>
+    <string name="sync_empty">Akukho okulinde ukuthunyelwa. Imibiko engaxhunyiwe izovela lapha.</string>
     <string name="sync_row">%1$s · %2$s · ukuzama %3$d</string>
     <string name="sync_status_pending">Kulindwe</string>
     <string name="sync_status_ack">Kuthunyelwe</string>
