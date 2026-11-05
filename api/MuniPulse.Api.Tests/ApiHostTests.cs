@@ -52,6 +52,18 @@ public class ApiHostTests : IClassFixture<ApiFactory>
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    [Fact]
+    public async Task FcmTokenRoutesWithoutATokenAreUnauthorized()
+    {
+        var register = await _client.PostAsJsonAsync(
+            "/api/v1/devices/fcm-token",
+            new { token = "fcm-demo-token", platform = "android" });
+        var clear = await _client.DeleteAsync("/api/v1/devices/fcm-token");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, register.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, clear.StatusCode);
+    }
 }
 
 public class ApiFactory : WebApplicationFactory<Program>

@@ -20,6 +20,8 @@ public static class ApiEndpoints
         api.MapPost("/incidents", CreateIncident).RequireAuthorization().RequireRateLimiting("writes");
         api.MapPost("/media/sas", IssueMediaSas).RequireAuthorization().RequireRateLimiting("writes");
         api.MapPost("/sync/push", PushSync).RequireAuthorization().RequireRateLimiting("writes");
+        api.MapPost("/devices/fcm-token", RegisterFcmToken).RequireAuthorization().RequireRateLimiting("writes");
+        api.MapDelete("/devices/fcm-token", ClearFcmToken).RequireAuthorization().RequireRateLimiting("writes");
         api.MapGet("/incidents/aggregates", ListAggregates).RequireAuthorization();
         api.MapGet("/incidents/nearby", ListNearby).RequireAuthorization();
         api.MapGet("/incidents/{id}", GetIncident).RequireAuthorization();
@@ -494,6 +496,83 @@ public static class ApiEndpoints
             PhotoIds = operation.PhotoIds,
             ClientMutationId = operation.ClientMutationId,
         };
+
+    private static async Task<IResult> RegisterFcmToken(
+        FcmTokenRequest? request,
+        HttpContext http,
+        IncidentStore store,
+        ILogger<IncidentStore> logger,
+        CancellationToken cancellationToken)
+    {
+        var user = await RequireUserAsync(http, store, cancellationToken);
+        if (user is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Sign in is required.");
+        }
+
+        if (request is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status400BadRequest, "VALIDATION_ERROR", "A JSON body is required.");
+        }
+
+        var fields = ValidateFcmToken(request);
+        if (fields.Count > 0)
+        {
+            return ApiErrors.Result(
+                http,
+                StatusCodes.Status400BadRequest,
+                "VALIDATION_ERROR",
+                "One or more fields are invalid.",
+                fields);
+        }
+
+        await store.UpsertDeviceTokenAsync(
+            new DevicePushToken
+            {
+                UserId = user.Id,
+                Token = request.Token!.Trim(),
+                Platform = request.Platform!.Trim(),
+                UpdatedAt = DateTime.UtcNow,
+            },
+            cancellationToken);
+        logger.LogInformation("FCM token stored for platform {Platform}", request.Platform.Trim());
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> ClearFcmToken(
+        HttpContext http,
+        IncidentStore store,
+        ILogger<IncidentStore> logger,
+        CancellationToken cancellationToken)
+    {
+        var user = await RequireUserAsync(http, store, cancellationToken);
+        if (user is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Sign in is required.");
+        }
+
+        await store.DeleteDeviceTokensAsync(user.Id, cancellationToken);
+        logger.LogInformation("FCM tokens cleared for the signed-in user");
+        return Results.NoContent();
+    }
+
+    public static Dictionary<string, string> ValidateFcmToken(FcmTokenRequest request)
+    {
+        var fields = new Dictionary<string, string>();
+        var token = request.Token?.Trim() ?? "";
+        if (token.Length is < 1 or > 4096)
+        {
+            fields["token"] = "Send a device push token.";
+        }
+
+        var platform = request.Platform?.Trim() ?? "";
+        if (!string.Equals(platform, "android", StringComparison.Ordinal))
+        {
+            fields["platform"] = "Use android.";
+        }
+
+        return fields;
+    }
 
     private static async Task<IResult> IssueMediaSas(
         MediaSasRequest? request,
@@ -1200,6 +1279,13 @@ public static class SyncResults
     public const string Ack = "ack";
 
     public const string Conflict = "conflict";
+}
+
+public sealed class FcmTokenRequest
+{
+    public string? Token { get; set; }
+
+    public string? Platform { get; set; }
 }
 
 public sealed class SyncPushRequest

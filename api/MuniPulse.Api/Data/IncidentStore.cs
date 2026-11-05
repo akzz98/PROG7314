@@ -11,6 +11,7 @@ public sealed class IncidentStore
     private readonly IMongoCollection<IncidentReport>? _incidents;
     private readonly IMongoCollection<WardDocument>? _wards;
     private readonly IMongoCollection<MediaAsset>? _media;
+    private readonly IMongoCollection<DevicePushToken>? _deviceTokens;
     private readonly ILogger<IncidentStore> _logger;
 
     public IncidentStore(IConfiguration configuration, ILogger<IncidentStore> logger)
@@ -38,6 +39,7 @@ public sealed class IncidentStore
             _incidents = database.GetCollection<IncidentReport>("incidents");
             _wards = database.GetCollection<WardDocument>("wards");
             _media = database.GetCollection<MediaAsset>("media");
+            _deviceTokens = database.GetCollection<DevicePushToken>("device_tokens");
         }
         catch (Exception ex) when (ex is FormatException or ArgumentException)
         {
@@ -49,7 +51,7 @@ public sealed class IncidentStore
 
     public async Task SeedAsync(CancellationToken cancellationToken)
     {
-        if (_users is null || _incidents is null || _wards is null)
+        if (_users is null || _incidents is null || _wards is null || _deviceTokens is null)
         {
             return;
         }
@@ -73,6 +75,14 @@ public sealed class IncidentStore
                         incident => incident.ClientMutationId,
                         BsonType.String),
                 }),
+            cancellationToken: cancellationToken);
+
+        await _deviceTokens.Indexes.CreateOneAsync(
+            new CreateIndexModel<DevicePushToken>(
+                Builders<DevicePushToken>.IndexKeys
+                    .Ascending(token => token.UserId)
+                    .Ascending(token => token.Platform),
+                new CreateIndexOptions { Unique = true, Name = "ux_user_platform" }),
             cancellationToken: cancellationToken);
 
         foreach (var ward in WardCatalog.All)
@@ -174,6 +184,40 @@ public sealed class IncidentStore
             return await Incidents()
                 .Find(incident => incident.ReporterId == reporterId && incident.ClientMutationId == clientMutationId)
                 .FirstOrDefaultAsync(cancellationToken);
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
+    }
+
+    public async Task UpsertDeviceTokenAsync(DevicePushToken token, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var update = Builders<DevicePushToken>.Update
+                .Set(existing => existing.Token, token.Token)
+                .Set(existing => existing.UpdatedAt, token.UpdatedAt)
+                .SetOnInsert(existing => existing.Id, ObjectId.GenerateNewId().ToString())
+                .SetOnInsert(existing => existing.UserId, token.UserId)
+                .SetOnInsert(existing => existing.Platform, token.Platform);
+            await DeviceTokens().UpdateOneAsync(
+                existing => existing.UserId == token.UserId && existing.Platform == token.Platform,
+                update,
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken);
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
+    }
+
+    public async Task DeleteDeviceTokensAsync(string userId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await DeviceTokens().DeleteManyAsync(token => token.UserId == userId, cancellationToken);
         }
         catch (MongoException ex)
         {
@@ -538,6 +582,9 @@ public sealed class IncidentStore
 
     private IMongoCollection<MediaAsset> Media() =>
         _media ?? throw NotConfigured();
+
+    private IMongoCollection<DevicePushToken> DeviceTokens() =>
+        _deviceTokens ?? throw NotConfigured();
 
     private IMongoCollection<IncidentReport> Incidents() =>
         _incidents ?? throw NotConfigured();

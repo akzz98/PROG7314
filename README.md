@@ -47,7 +47,7 @@ flowchart TB
 
 Part 2 includes Google SSO, Settings, the custom API and database, and custom features UD-1 (photo + GPS), UD-2 (upvotes and ward aggregation), and UD-3 (resolution timeline).
 
-Final POE still to come: syncing the queue, FCM, the emergency map (UD-4), and impact scores (UD-5). English, isiZulu, biometric unlock, Azure Blob photos, and the Room database are in this build. With no network, a valid report is stored on the phone and the form says it is queued.
+Final POE still to come: ticket and ward pushes, the emergency map (UD-4), and impact scores (UD-5). English, isiZulu, biometric unlock, Azure Blob photos, the Room queue, and FCM token registration are in this build. With no network, a valid report is stored on the phone and the form says it is queued.
 
 ## Layout
 
@@ -164,6 +164,7 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 | GET, PATCH | `/api/v1/me` | Bearer API JWT |
 | POST | `/api/v1/media/sas` | Bearer API JWT. Body is `contentType` (`image/jpeg`) and `byteSize` (1 to 5 MB). Returns `photoId`, `uploadUrl`, and `expiresAt`. The link lasts 15 minutes. The app uploads the JPEG to that URL. |
 | POST | `/api/v1/sync/push` | Bearer API JWT. A batch of 1 to 20 queued `createIncident` operations. Each result is `ack` or `conflict`. Photos are uploaded with the media link first. |
+| POST, DELETE | `/api/v1/devices/fcm-token` | Bearer API JWT. POST body is `token` and `platform` (`android`). Stores the device push token. DELETE removes that user's tokens. Sign-out calls DELETE. |
 | POST, GET | `/api/v1/incidents` and `/api/v1/incidents/{id}` | Bearer API JWT. Detail photos include a short-lived read URL when the blob is recorded. |
 | GET | `/api/v1/incidents/aggregates` | Bearer API JWT. Open reports in the ward, grouped when they share an `aggregateId`. |
 | GET | `/api/v1/incidents/nearby` | Bearer API JWT. Open reports in the same ward and category within 250 metres and 14 days. |
@@ -202,7 +203,7 @@ Home is the ward pulse. It shows the default ward, a count of open incidents in 
 
 When a session exists, the app calls `GET /api/v1/me`. Changing the ward or ticket-status and area-emergency switches calls `PATCH /api/v1/me`. Marketing and news stay on the device and are not sent. If the API is unreachable, the change stays local and Settings says so. The next successful sync sends that change. Preferred language is English or isiZulu. Settings opens a language screen, saves `en` or `zu` with `PATCH /api/v1/me`, and the open screens switch without reinstalling the app.
 
-Settings opens notification preferences: ticket status and area emergencies start on, and marketing and news start off. Those three choices stay on the device. Push delivery is Final POE and is not implemented.
+Settings opens notification preferences: ticket status and area emergencies start on, and marketing and news start off. Those three choices stay on the device. After sign-in the app registers an FCM token with `POST /api/v1/devices/fcm-token`. Sign-out clears that token. Ticket and ward push delivery is still to come.
 
 Language opens from Settings and switches the app between English and isiZulu. Biometric unlock can be turned on in Settings. A cold start then asks for a fingerprint or face before Home, with Google sign-in as the fallback. Settings opens the sync centre. It lists queued reports, the last sync time, a retry on each queued report, and **Sync now**. An empty queue has its own message. With a network connection, **Sync now** uploads the queued photos and calls `POST /api/v1/sync/push`. Each report comes back as sent or a conflict. The same `clientMutationId` returns the existing incident and the queue marks that report sent. A queued description edit against a report that is already resolved does not change that status. The sync centre says the server description was kept.
 

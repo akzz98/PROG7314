@@ -8,6 +8,7 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -75,6 +76,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private val settingsMirror = LocalSettingsMirror(application)
     private val onboardingStore = OnboardingStore(application)
     private val notificationStore = NotificationStore(application)
+    private val pushTokenStore = PushTokenStore(application)
     private val _appliedLanguage = MutableStateFlow(appLanguage.read())
     val appliedLanguage: StateFlow<String> = _appliedLanguage.asStateFlow()
     private val _biometricEnabled = MutableStateFlow(biometricStore.read())
@@ -182,6 +184,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 preferredLanguage = persistLanguage(sessionStore.readLanguage() ?: appLanguage.read()),
             )
             requestProfileSync(pushLocal = false)
+            registerPushToken(stored.accessToken)
             return
         }
         _restoring.value = true
@@ -889,12 +892,16 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         _gateMessage.value = ""
         _gateWorking.value = false
         _syncCentre.value = SyncCentreUi.Loading
+        val token = accessToken
         accessToken = null
         sessionStore.clear()
         notificationStore.setPendingSync(false)
-        GoogleSignIn.signOut(getApplication())
-        Log.i(TAG, "Signed out")
-        refresh()
+        viewModelScope.launch {
+            clearPushRegistration(token)
+            GoogleSignIn.signOut(getApplication())
+            Log.i(TAG, "Signed out")
+            refresh()
+        }
     }
 
     private fun exchangeSession(user: FirebaseUser) {
@@ -939,6 +946,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 applyRemoteNotifications(session.user.notifications)
             }
             Log.i(TAG, "API session issued for user ${session.user.id}")
+            registerPushToken(session.accessToken)
             getApplication<Application>().getString(R.string.session_ready)
         } catch (error: Exception) {
             accessToken = null
@@ -1142,6 +1150,41 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             preferredLanguage = LanguageCodes.normalize(preferredLanguage),
             role = role.ifBlank { "Citizen" },
         )
+
+    private fun registerPushToken(accessToken: String) {
+        viewModelScope.launch {
+            try {
+                val token = pushTokenStore.read()
+                    ?: FirebaseMessaging.getInstance().token.await().also { pushTokenStore.save(it) }
+                if (token.isBlank()) {
+                    Log.w(TAG, "FCM token was empty")
+                    return@launch
+                }
+                PushClient.register(accessToken, token)
+                Log.i(TAG, "FCM token registered")
+            } catch (error: Exception) {
+                Log.e(TAG, "FCM token register failed: ${error.javaClass.simpleName}")
+            }
+        }
+    }
+
+    private suspend fun clearPushRegistration(accessToken: String?) {
+        try {
+            if (!accessToken.isNullOrBlank()) {
+                PushClient.clear(accessToken)
+                Log.i(TAG, "FCM token cleared on the API")
+            }
+        } catch (error: Exception) {
+            Log.e(TAG, "FCM token clear failed: ${error.javaClass.simpleName}")
+        }
+        pushTokenStore.clear()
+        try {
+            FirebaseMessaging.getInstance().deleteToken().await()
+            Log.i(TAG, "FCM token deleted on this phone")
+        } catch (error: Exception) {
+            Log.e(TAG, "FCM token delete failed: ${error.javaClass.simpleName}")
+        }
+    }
 
     private fun mirrorSettings() {
         viewModelScope.launch {

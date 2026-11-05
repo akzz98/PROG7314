@@ -50,6 +50,21 @@ public sealed class MediaAsset
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+public sealed class DevicePushToken
+{
+    [BsonId]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+
+    public string UserId { get; set; } = "";
+
+    public string Token { get; set; } = "";
+
+    public string Platform { get; set; } = "";
+
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
 public sealed class NotificationPreferences
 {
     public bool TicketStatus { get; set; } = true;
