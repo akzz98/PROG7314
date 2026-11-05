@@ -164,6 +164,8 @@
     <string name="sync_status_conflict">Kuphikisana</string>
     <string name="sync_offline">Ayikho inethiwekhi. Le mibiko ihlala kule foni.</string>
     <string name="sync_waiting">Usuxhumekile. Le mibiko isekule foni.</string>
+    <string name="sync_sent">Kuthunyelwe %1$d. Kuphikisana %2$d.</string>
+    <string name="sync_push_failed">Ulayini awuthunyelwanga. Zama futhi.</string>
     <string name="sync_failed">Isikhungo sokuvumelanisa asifundekanga.</string>
     <string name="sync_error_offline">Ayikho inethiwekhi</string>
     <string name="sync_error_waiting">Ilinde ukuthunyelwa</string>

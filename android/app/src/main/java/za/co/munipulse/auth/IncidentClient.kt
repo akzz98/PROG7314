@@ -81,6 +81,14 @@ object IncidentClient {
         return IncidentCreateOutcome.Created(created.id)
     }
 
+    suspend fun push(accessToken: String, body: SyncPushBody): List<SyncPushResultBody> {
+        val response = api.push(bearer(accessToken), body)
+        if (!response.isSuccessful) {
+            throw incidentError(response)
+        }
+        return response.body()?.results.orEmpty()
+    }
+
     suspend fun listNearby(
         accessToken: String,
         category: String,
@@ -259,6 +267,12 @@ private interface IncidentApi {
         @Header("Authorization") authorization: String,
         @Body body: MediaSasBody,
     ): Response<MediaSasResponse>
+
+    @POST("api/v1/sync/push")
+    suspend fun push(
+        @Header("Authorization") authorization: String,
+        @Body body: SyncPushBody,
+    ): Response<SyncPushResponse>
 }
 
 data class MediaSasBody(val contentType: String, val byteSize: Long)
@@ -267,6 +281,29 @@ data class MediaSasResponse(
     val photoId: String = "",
     val uploadUrl: String = "",
     val expiresAt: String = "",
+)
+
+data class SyncPushBody(val operations: List<SyncOperationBody>)
+
+data class SyncOperationBody(
+    val clientMutationId: String,
+    val mutationType: String,
+    val category: String,
+    val description: String,
+    val latitude: Double,
+    val longitude: Double,
+    val accuracyMeters: Float?,
+    val wardCode: String,
+    val photoIds: List<String>,
+)
+
+data class SyncPushResponse(val results: List<SyncPushResultBody> = emptyList())
+
+data class SyncPushResultBody(
+    val clientMutationId: String = "",
+    val result: String = "",
+    val incidentId: String? = null,
+    val code: String? = null,
 )
 
 data class CreateIncidentBody(

@@ -19,6 +19,7 @@ public static class ApiEndpoints
         api.MapPatch("/me", PatchMe).RequireAuthorization();
         api.MapPost("/incidents", CreateIncident).RequireAuthorization().RequireRateLimiting("writes");
         api.MapPost("/media/sas", IssueMediaSas).RequireAuthorization().RequireRateLimiting("writes");
+        api.MapPost("/sync/push", PushSync).RequireAuthorization().RequireRateLimiting("writes");
         api.MapGet("/incidents/aggregates", ListAggregates).RequireAuthorization();
         api.MapGet("/incidents/nearby", ListNearby).RequireAuthorization();
         api.MapGet("/incidents/{id}", GetIncident).RequireAuthorization();
@@ -199,6 +200,24 @@ public static class ApiEndpoints
             return photoProblem;
         }
 
+        var incident = await SaveNewIncident(request, user, store, logger, mutationId, cancellationToken);
+
+        return Results.Created($"/api/v1/incidents/{incident.Id}", new CreateIncidentResponse(
+            incident.Id,
+            incident.Status,
+            incident.UpvoteCount,
+            incident.AggregateId,
+            incident.CreatedAt));
+    }
+
+    private static async Task<IncidentReport> SaveNewIncident(
+        CreateIncidentRequest request,
+        UserProfile user,
+        IncidentStore store,
+        ILogger logger,
+        string? mutationId,
+        CancellationToken cancellationToken)
+    {
         var now = DateTime.UtcNow;
         var incident = new IncidentReport
         {
@@ -265,13 +284,121 @@ public static class ApiEndpoints
                 incident.Category);
         }
 
-        return Results.Created($"/api/v1/incidents/{incident.Id}", new CreateIncidentResponse(
-            incident.Id,
-            incident.Status,
-            incident.UpvoteCount,
-            incident.AggregateId,
-            incident.CreatedAt));
+        return incident;
     }
+
+    private static async Task<IResult> PushSync(
+        SyncPushRequest? request,
+        HttpContext http,
+        IncidentStore store,
+        BlobPhotos photos,
+        ILogger<IncidentStore> logger,
+        CancellationToken cancellationToken)
+    {
+        var user = await RequireUserAsync(http, store, cancellationToken);
+        if (user is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Sign in is required.");
+        }
+
+        if (PushEnvelopeError(request?.Operations?.Count) is not null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status400BadRequest, "VALIDATION_ERROR", "One or more fields are invalid.");
+        }
+
+        var operations = request!.Operations!;
+        var results = new SyncPushItemResult[operations.Count];
+        var ready = new List<int>();
+        for (var index = 0; index < operations.Count; index++)
+        {
+            var operation = operations[index];
+            var conflict = PushConflictCode(operation);
+            if (conflict is not null)
+            {
+                results[index] = new SyncPushItemResult(operation.ClientMutationId?.Trim(), SyncResults.Conflict, null, conflict);
+                continue;
+            }
+
+            var create = ToCreateRequest(operation);
+            var gate = await GatePhotos(create, user, photos, store, cancellationToken);
+            if (gate == PhotoGate.Unavailable)
+            {
+                return ApiErrors.Result(
+                    http,
+                    StatusCodes.Status503ServiceUnavailable,
+                    "STORAGE_UNAVAILABLE",
+                    "Photo storage could not be reached.");
+            }
+
+            if (gate == PhotoGate.Invalid)
+            {
+                results[index] = new SyncPushItemResult(operation.ClientMutationId?.Trim(), SyncResults.Conflict, null, "VALIDATION_ERROR");
+                continue;
+            }
+
+            var mutationId = operation.ClientMutationId!.Trim();
+            var existing = await store.FindByMutationAsync(user.Id, mutationId, cancellationToken);
+            if (existing is not null)
+            {
+                results[index] = new SyncPushItemResult(mutationId, SyncResults.Conflict, existing.Id, "DUPLICATE_MUTATION");
+                continue;
+            }
+
+            ready.Add(index);
+        }
+
+        foreach (var index in ready)
+        {
+            var operation = operations[index];
+            var mutationId = operation.ClientMutationId!.Trim();
+            var incident = await SaveNewIncident(ToCreateRequest(operation), user, store, logger, mutationId, cancellationToken);
+            results[index] = new SyncPushItemResult(mutationId, SyncResults.Ack, incident.Id, null);
+        }
+
+        var ackCount = results.Count(item => item.Result == SyncResults.Ack);
+        var conflictCount = results.Count(item => item.Result == SyncResults.Conflict);
+        logger.LogInformation("Sync push finished. Ack {AckCount}. Conflict {ConflictCount}", ackCount, conflictCount);
+        return Results.Ok(new SyncPushResponse(results));
+    }
+
+    public static string? PushEnvelopeError(int? operationCount)
+    {
+        if (operationCount is null or < 1 or > 20)
+        {
+            return "Send 1 to 20 operations.";
+        }
+
+        return null;
+    }
+
+    public static string? PushConflictCode(SyncOperationRequest? operation)
+    {
+        if (operation is null || !string.Equals(operation.MutationType?.Trim(), "createIncident", StringComparison.Ordinal))
+        {
+            return "UNKNOWN_MUTATION";
+        }
+
+        var mutationId = operation.ClientMutationId?.Trim() ?? "";
+        if (mutationId.Length is < 1 or > 80)
+        {
+            return "VALIDATION_ERROR";
+        }
+
+        return ValidateCreate(ToCreateRequest(operation)).Count > 0 ? "VALIDATION_ERROR" : null;
+    }
+
+    private static CreateIncidentRequest ToCreateRequest(SyncOperationRequest operation) =>
+        new()
+        {
+            Category = operation.Category,
+            Description = operation.Description,
+            Latitude = operation.Latitude,
+            Longitude = operation.Longitude,
+            AccuracyMeters = operation.AccuracyMeters,
+            WardCode = operation.WardCode,
+            PhotoIds = operation.PhotoIds,
+            ClientMutationId = operation.ClientMutationId,
+        };
 
     private static async Task<IResult> IssueMediaSas(
         MediaSasRequest? request,
@@ -343,22 +470,51 @@ public static class ApiEndpoints
         HttpContext http,
         CancellationToken cancellationToken)
     {
+        var gate = await GatePhotos(request, user, photos, store, cancellationToken);
+        if (gate == PhotoGate.Ok)
+        {
+            return null;
+        }
+
+        if (gate == PhotoGate.Unavailable)
+        {
+            var message = photos.IsConfigured
+                ? "Photo storage could not be reached."
+                : "Photo storage is not configured. Set AzureBlob:ConnectionString in user-secrets.";
+            return ApiErrors.Result(
+                http,
+                StatusCodes.Status503ServiceUnavailable,
+                "STORAGE_UNAVAILABLE",
+                message);
+        }
+
+        return ApiErrors.Result(
+            http,
+            StatusCodes.Status400BadRequest,
+            "VALIDATION_ERROR",
+            "One or more fields are invalid.",
+            new Dictionary<string, string> { ["photoIds"] = "Upload each photo before submitting." });
+    }
+
+    private static async Task<PhotoGate> GatePhotos(
+        CreateIncidentRequest request,
+        UserProfile user,
+        BlobPhotos photos,
+        IncidentStore store,
+        CancellationToken cancellationToken)
+    {
         var ids = (request.PhotoIds ?? [])
             .Select(photo => photo.Trim())
             .Where(photo => photo.Length > 0)
             .ToList();
         if (ids.Count == 0)
         {
-            return null;
+            return PhotoGate.Ok;
         }
 
         if (!photos.IsConfigured)
         {
-            return ApiErrors.Result(
-                http,
-                StatusCodes.Status503ServiceUnavailable,
-                "STORAGE_UNAVAILABLE",
-                "Photo storage is not configured. Set AzureBlob:ConnectionString in user-secrets.");
+            return PhotoGate.Unavailable;
         }
 
         foreach (var id in ids)
@@ -366,36 +522,29 @@ public static class ApiEndpoints
             var media = BlobPhotos.IsPhotoId(id) ? await store.FindMediaAsync(id, cancellationToken) : null;
             if (media is null || !string.Equals(media.CreatedBy, user.Id, StringComparison.Ordinal))
             {
-                return ApiErrors.Result(
-                    http,
-                    StatusCodes.Status400BadRequest,
-                    "VALIDATION_ERROR",
-                    "One or more fields are invalid.",
-                    new Dictionary<string, string> { ["photoIds"] = "Upload each photo before submitting." });
+                return PhotoGate.Invalid;
             }
 
             var check = await photos.ExistsAsync(media.BlobName, cancellationToken);
             if (check == BlobCheck.Unavailable)
             {
-                return ApiErrors.Result(
-                    http,
-                    StatusCodes.Status503ServiceUnavailable,
-                    "STORAGE_UNAVAILABLE",
-                    "Photo storage could not be reached.");
+                return PhotoGate.Unavailable;
             }
 
             if (check == BlobCheck.Missing)
             {
-                return ApiErrors.Result(
-                    http,
-                    StatusCodes.Status400BadRequest,
-                    "VALIDATION_ERROR",
-                    "One or more fields are invalid.",
-                    new Dictionary<string, string> { ["photoIds"] = "Upload each photo before submitting." });
+                return PhotoGate.Invalid;
             }
         }
 
-        return null;
+        return PhotoGate.Ok;
+    }
+
+    private enum PhotoGate
+    {
+        Ok,
+        Invalid,
+        Unavailable,
     }
 
     private static async Task<IResult> ListAggregates(
@@ -950,6 +1099,43 @@ public sealed class NotificationPatch
 
     public bool? AreaEmergencies { get; set; }
 }
+
+public static class SyncResults
+{
+    public const string Ack = "ack";
+
+    public const string Conflict = "conflict";
+}
+
+public sealed class SyncPushRequest
+{
+    public List<SyncOperationRequest>? Operations { get; set; }
+}
+
+public sealed class SyncOperationRequest
+{
+    public string? ClientMutationId { get; set; }
+
+    public string? MutationType { get; set; }
+
+    public string? Category { get; set; }
+
+    public string? Description { get; set; }
+
+    public double? Latitude { get; set; }
+
+    public double? Longitude { get; set; }
+
+    public double? AccuracyMeters { get; set; }
+
+    public string? WardCode { get; set; }
+
+    public List<string>? PhotoIds { get; set; }
+}
+
+public sealed record SyncPushResponse(SyncPushItemResult[] Results);
+
+public sealed record SyncPushItemResult(string? ClientMutationId, string Result, string? IncidentId, string? Code);
 
 public sealed class CreateIncidentRequest
 {

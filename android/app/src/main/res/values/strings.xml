@@ -164,6 +164,8 @@
     <string name="sync_status_conflict">Conflict</string>
     <string name="sync_offline">No network. These reports stay on this phone.</string>
     <string name="sync_waiting">Back online. These reports are still on this phone.</string>
+    <string name="sync_sent">Sent %1$d. Conflicts %2$d.</string>
+    <string name="sync_push_failed">The queue was not sent. Try again.</string>
     <string name="sync_failed">The sync centre could not be read.</string>
     <string name="sync_error_offline">No network</string>
     <string name="sync_error_waiting">Waiting to send</string>

@@ -44,6 +44,14 @@ public class ApiHostTests : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, create.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, milestone.StatusCode);
     }
+
+    [Fact]
+    public async Task SyncPushWithoutATokenIsUnauthorized()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/sync/push", new { operations = Array.Empty<object>() });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
 }
 
 public class ApiFactory : WebApplicationFactory<Program>

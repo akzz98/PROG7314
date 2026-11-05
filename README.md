@@ -163,6 +163,7 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 | POST | `/api/v1/auth/session` | Firebase ID token in the body. The API checks it against Google's securetoken certificates, then returns an API JWT. |
 | GET, PATCH | `/api/v1/me` | Bearer API JWT |
 | POST | `/api/v1/media/sas` | Bearer API JWT. Body is `contentType` (`image/jpeg`) and `byteSize` (1 to 5 MB). Returns `photoId`, `uploadUrl`, and `expiresAt`. The link lasts 15 minutes. The app uploads the JPEG to that URL. |
+| POST | `/api/v1/sync/push` | Bearer API JWT. A batch of 1 to 20 queued `createIncident` operations. Each result is `ack` or `conflict`. Photos are uploaded with the media link first. |
 | POST, GET | `/api/v1/incidents` and `/api/v1/incidents/{id}` | Bearer API JWT. Detail photos include a short-lived read URL when the blob is recorded. |
 | GET | `/api/v1/incidents/aggregates` | Bearer API JWT. Open reports in the ward, grouped when they share an `aggregateId`. |
 | GET | `/api/v1/incidents/nearby` | Bearer API JWT. Open reports in the same ward and category within 250 metres and 14 days. |
@@ -203,7 +204,7 @@ When a session exists, the app calls `GET /api/v1/me`. Changing the ward or tick
 
 Settings opens notification preferences: ticket status and area emergencies start on, and marketing and news start off. Those three choices stay on the device. Push delivery is Final POE and is not implemented.
 
-Language opens from Settings and switches the app between English and isiZulu. Biometric unlock can be turned on in Settings. A cold start then asks for a fingerprint or face before Home, with Google sign-in as the fallback. Settings opens the sync centre. It lists queued reports, the last sync time, a retry on each queued report, and **Sync now**. Sync now records the attempt on the phone. It does not send the queue to the API yet.
+Language opens from Settings and switches the app between English and isiZulu. Biometric unlock can be turned on in Settings. A cold start then asks for a fingerprint or face before Home, with Google sign-in as the fallback. Settings opens the sync centre. It lists queued reports, the last sync time, a retry on each queued report, and **Sync now**. With a network connection, **Sync now** uploads the queued photos and calls `POST /api/v1/sync/push`. Each report comes back as sent or a conflict. A duplicate is still a conflict.
 
 Settings includes a POPIA-style privacy note: name, email, ward, location, and photos are kept only for this demo, and location and photos are used to report a fault.
 

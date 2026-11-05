@@ -49,6 +49,14 @@ object QueuedIncident {
     fun photoColumn(photoPaths: List<String>): String? =
         if (photoPaths.isEmpty()) null else gson.toJson(photoPaths)
 
+    fun readPhotoPaths(column: String?): List<String> {
+        if (column.isNullOrBlank()) {
+            return emptyList()
+        }
+        return gson.fromJson(column, Array<String>::class.java)?.toList()
+            ?: throw IllegalArgumentException("photos")
+    }
+
     fun readPayload(json: String): QueuedIncidentPayload =
         gson.fromJson(json, QueuedIncidentPayload::class.java)
 }

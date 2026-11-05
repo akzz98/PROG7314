@@ -25,6 +25,18 @@ class LocalSettingsMirror(context: Context) {
         Log.i(TAG, "Settings mirror saved. Language $code")
     }
 
+    suspend fun markSynced(at: Long) {
+        val existing = settings.read()
+        settings.save(
+            LocalSettings(
+                biometricEnabled = existing?.biometricEnabled ?: biometric.read(),
+                lastSyncAt = at,
+                language = existing?.language ?: LanguageCodes.normalize(language.read()),
+            ),
+        )
+        Log.i(TAG, "Last sync recorded")
+    }
+
     private companion object {
         const val TAG = "MuniPulseSync"
     }

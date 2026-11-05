@@ -8,6 +8,7 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseUser
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,10 +16,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import za.co.munipulse.R
 import za.co.munipulse.data.DeviceNetwork
 import za.co.munipulse.data.LocalSettingsMirror
 import za.co.munipulse.data.MuniPulseDatabase
+import za.co.munipulse.data.PendingSyncOperation
 import za.co.munipulse.data.QueuedIncident
 import za.co.munipulse.data.QueuedPhotos
 import za.co.munipulse.data.SyncAttempt
@@ -40,6 +43,7 @@ import za.co.munipulse.ui.incidents.MyIncidentsUi
 import za.co.munipulse.ui.incidents.IncidentTime
 import za.co.munipulse.ui.incidents.TimelineLine
 import za.co.munipulse.ui.incidents.WardHotspotsUi
+import java.io.File
 
 sealed interface SignInUiState {
     data object Checking : SignInUiState
@@ -680,15 +684,17 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             try {
                 val database = MuniPulseDatabase.get(getApplication())
                 val row = database.pendingSync().list().firstOrNull { it.id == id }
-                if (row != null) {
-                    val online = DeviceNetwork.isOnline(getApplication())
-                    val updated = SyncAttempt.retry(row, online)
-                    if (updated != row) {
-                        database.pendingSync().upsert(updated)
-                        Log.i(TAG, "Queued retry ${updated.id}. Count ${updated.retryCount}")
-                    }
+                if (row == null || row.status != SyncStatus.PENDING) {
+                    publishSyncCentre(note = currentSyncNote(), busy = false)
+                    return@launch
                 }
-                publishSyncCentre(note = syncNote(DeviceNetwork.isOnline(getApplication())), busy = false)
+                if (!DeviceNetwork.isOnline(getApplication())) {
+                    database.pendingSync().upsert(SyncAttempt.retry(row, online = false))
+                    Log.i(TAG, "Queued retry ${row.id}. Count ${row.retryCount + 1}")
+                    publishSyncCentre(note = syncNote(online = false), busy = false)
+                    return@launch
+                }
+                pushRows(listOf(row))
             } catch (error: Exception) {
                 Log.e(TAG, "Sync centre retry failed: ${error.javaClass.simpleName}")
                 publishSyncCentre(note = syncFailedNote(), busy = false)
@@ -703,16 +709,114 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 val online = DeviceNetwork.isOnline(getApplication())
                 val database = MuniPulseDatabase.get(getApplication())
                 val pending = database.pendingSync().list().filter { it.status == SyncStatus.PENDING }
-                pending.forEach { row ->
-                    database.pendingSync().upsert(SyncAttempt.retry(row, online))
+                if (!online) {
+                    pending.forEach { row ->
+                        database.pendingSync().upsert(SyncAttempt.retry(row, online = false))
+                    }
+                    Log.i(TAG, "Sync now recorded ${pending.size} queued reports. Online false")
+                    publishSyncCentre(note = syncNote(online = false), busy = false)
+                    return@launch
                 }
-                Log.i(TAG, "Sync now recorded ${pending.size} queued reports. Online $online")
-                publishSyncCentre(note = syncNote(online), busy = false)
+                if (pending.isEmpty()) {
+                    publishSyncCentre(note = syncNote(online = true), busy = false)
+                    return@launch
+                }
+                pushRows(pending)
             } catch (error: Exception) {
                 Log.e(TAG, "Sync now failed: ${error.javaClass.simpleName}")
                 publishSyncCentre(note = syncFailedNote(), busy = false)
             }
         }
+    }
+
+    private suspend fun pushRows(rows: List<PendingSyncOperation>) {
+        val token = accessToken
+        if (token.isNullOrBlank()) {
+            Log.w(TAG, "Sync push skipped. No API session")
+            publishSyncCentre(note = getApplication<Application>().getString(R.string.report_auth), busy = false)
+            return
+        }
+        val database = MuniPulseDatabase.get(getApplication())
+        val ready = ArrayList<Pair<PendingSyncOperation, List<String>>>()
+        for (row in rows) {
+            if (row.status != SyncStatus.PENDING) {
+                continue
+            }
+            try {
+                val paths = QueuedIncident.readPhotoPaths(row.photoLocalUri)
+                val files = readQueuedPhotos(paths) ?: throw IncidentRequestException("UPLOAD_FAILED", "photo")
+                val photoIds = if (files.isEmpty()) emptyList() else IncidentClient.uploadPhotos(token, files)
+                ready += row to photoIds
+            } catch (error: Exception) {
+                val code = if (error is IncidentRequestException) error.code else "UPLOAD_FAILED"
+                database.pendingSync().upsert(row.copy(retryCount = row.retryCount + 1, lastError = code))
+                Log.e(TAG, "Queued photo upload failed: $code")
+            }
+        }
+        if (ready.isEmpty()) {
+            publishSyncCentre(note = getApplication<Application>().getString(R.string.sync_push_failed), busy = false)
+            return
+        }
+        try {
+            val operations = ready.map { (row, photoIds) ->
+                val payload = QueuedIncident.readPayload(row.payloadJson)
+                SyncOperationBody(
+                    clientMutationId = row.id,
+                    mutationType = row.mutationType,
+                    category = payload.category,
+                    description = payload.description,
+                    latitude = payload.latitude,
+                    longitude = payload.longitude,
+                    accuracyMeters = payload.accuracyMeters,
+                    wardCode = payload.wardCode,
+                    photoIds = photoIds,
+                )
+            }
+            val results = IncidentClient.push(token, SyncPushBody(operations))
+            val byId = results.associateBy { it.clientMutationId }
+            var ackCount = 0
+            var conflictCount = 0
+            for ((row, _) in ready) {
+                val result = byId[row.id]
+                val updated = if (result == null) {
+                    row.copy(retryCount = row.retryCount + 1, lastError = "push")
+                } else {
+                    SyncAttempt.apply(row, result.result, result.code)
+                }
+                if (updated.status == SyncStatus.ACK) {
+                    ackCount += 1
+                }
+                if (updated.status == SyncStatus.CONFLICT) {
+                    conflictCount += 1
+                }
+                database.pendingSync().upsert(updated)
+            }
+            settingsMirror.markSynced(System.currentTimeMillis())
+            Log.i(TAG, "Sync push finished. Ack $ackCount. Conflict $conflictCount")
+            publishSyncCentre(
+                note = getApplication<Application>().getString(R.string.sync_sent, ackCount, conflictCount),
+                busy = false,
+            )
+        } catch (error: Exception) {
+            val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
+            Log.e(TAG, "Sync push failed: $reason")
+            publishSyncCentre(note = getApplication<Application>().getString(R.string.sync_push_failed), busy = false)
+        }
+    }
+
+    private suspend fun readQueuedPhotos(paths: List<String>): List<ByteArray>? = withContext(Dispatchers.IO) {
+        if (paths.isEmpty()) {
+            return@withContext emptyList()
+        }
+        val files = ArrayList<ByteArray>(paths.size)
+        for (path in paths) {
+            val file = File(path)
+            if (!file.isFile) {
+                return@withContext null
+            }
+            files += file.readBytes()
+        }
+        files
     }
 
     private suspend fun publishSyncCentre(note: String, busy: Boolean) {
