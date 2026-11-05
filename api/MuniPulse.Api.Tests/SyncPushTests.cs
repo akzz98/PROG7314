@@ -23,8 +23,25 @@ public class SyncPushTests
     public void AcceptsACreateAndRejectsAnythingElse()
     {
         Assert.Null(ApiEndpoints.PushConflictCode(Valid()));
-        Assert.Equal("UNKNOWN_MUTATION", ApiEndpoints.PushConflictCode(Valid(mutationType: "editIncident")));
+        Assert.Equal("UNKNOWN_MUTATION", ApiEndpoints.PushConflictCode(Valid(mutationType: "renameIncident")));
         Assert.Equal("VALIDATION_ERROR", ApiEndpoints.PushConflictCode(Valid(clientMutationId: "")));
+    }
+
+    [Fact]
+    public void KeepsAResolvedReportUnchanged()
+    {
+        var edit = new SyncOperationRequest
+        {
+            ClientMutationId = "device-uuid-1",
+            MutationType = "editIncident",
+            IncidentId = "6500inc001",
+            Description = "A deep hole in the road",
+        };
+
+        Assert.Null(ApiEndpoints.PushConflictCode(edit));
+        Assert.Equal("RESOLVED", ApiEndpoints.ResolvedEditCode("Resolved"));
+        Assert.Null(ApiEndpoints.ResolvedEditCode("InProgress"));
+        Assert.Null(ApiEndpoints.ResolvedEditCode("Submitted"));
     }
 
     private static SyncOperationRequest Valid(string mutationType = "createIncident", string clientMutationId = "device-uuid-1") =>

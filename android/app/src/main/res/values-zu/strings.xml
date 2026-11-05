@@ -169,6 +169,7 @@
     <string name="sync_failed">Isikhungo sokuvumelanisa asifundekanga.</string>
     <string name="sync_error_offline">Ayikho inethiwekhi</string>
     <string name="sync_error_waiting">Ilinde ukuthunyelwa</string>
+    <string name="sync_error_resolved">Lo mbiko usuxazululiwe. Incazelo esevini igciniwe.</string>
     <string name="sync_error_other">Ayikwazanga ukuthumela</string>
     <string name="settings_final_poe">Kuza ku-POE yokugcina</string>
     <string name="profile_title">Iphrofayela</string>

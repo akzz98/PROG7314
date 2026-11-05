@@ -4,6 +4,7 @@ package za.co.munipulse.data
 object SyncAttempt {
     const val OFFLINE = "offline"
     const val WAITING = "waiting"
+    const val RESOLVED = "RESOLVED"
 
     fun apply(row: PendingSyncOperation, result: String, code: String?): PendingSyncOperation {
         if (code == "DUPLICATE_MUTATION") {

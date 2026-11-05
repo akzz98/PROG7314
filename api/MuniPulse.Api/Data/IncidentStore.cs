@@ -405,6 +405,27 @@ public sealed class IncidentStore
         }
     }
 
+    public async Task<bool> UpdateDescriptionAsync(
+        string incidentId,
+        string description,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await Incidents().UpdateOneAsync(
+                incident => incident.Id == incidentId && incident.Status != IncidentStatuses.Resolved,
+                Builders<IncidentReport>.Update
+                    .Set(incident => incident.Description, description)
+                    .Set(incident => incident.UpdatedAt, DateTime.UtcNow),
+                cancellationToken: cancellationToken);
+            return result.MatchedCount > 0;
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
+    }
+
     public async Task<IReadOnlyList<WardAggregate>> ListOpenAggregatesAsync(
         string wardCode,
         CancellationToken cancellationToken)

@@ -146,6 +146,7 @@ private fun statusLabel(status: String): String = when (status) {
 private fun errorLabel(code: String?): String? = when (code) {
     SyncAttempt.OFFLINE -> stringResource(R.string.sync_error_offline)
     SyncAttempt.WAITING -> stringResource(R.string.sync_error_waiting)
+    SyncAttempt.RESOLVED -> stringResource(R.string.sync_error_resolved)
     null, "" -> null
     else -> stringResource(R.string.sync_error_other)
 }

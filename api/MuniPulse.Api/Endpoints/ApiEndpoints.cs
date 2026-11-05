@@ -319,6 +319,12 @@ public static class ApiEndpoints
                 continue;
             }
 
+            if (IsQueuedEdit(operation))
+            {
+                results[index] = await EditQueuedIncident(operation, user, store, logger, cancellationToken);
+                continue;
+            }
+
             var create = ToCreateRequest(operation);
             var gate = await GatePhotos(create, user, photos, store, cancellationToken);
             if (gate == PhotoGate.Unavailable)
@@ -394,7 +400,7 @@ public static class ApiEndpoints
 
     public static string? PushConflictCode(SyncOperationRequest? operation)
     {
-        if (operation is null || !string.Equals(operation.MutationType?.Trim(), "createIncident", StringComparison.Ordinal))
+        if (operation is null)
         {
             return "UNKNOWN_MUTATION";
         }
@@ -405,7 +411,75 @@ public static class ApiEndpoints
             return "VALIDATION_ERROR";
         }
 
-        return ValidateCreate(ToCreateRequest(operation)).Count > 0 ? "VALIDATION_ERROR" : null;
+        var type = operation.MutationType?.Trim();
+        if (string.Equals(type, "createIncident", StringComparison.Ordinal))
+        {
+            return ValidateCreate(ToCreateRequest(operation)).Count > 0 ? "VALIDATION_ERROR" : null;
+        }
+
+        if (IsQueuedEdit(operation))
+        {
+            var incidentId = operation.IncidentId?.Trim() ?? "";
+            var description = operation.Description?.Trim() ?? "";
+            if (incidentId.Length is < 1 or > 80 || description.Length is < 10 or > 1000)
+            {
+                return "VALIDATION_ERROR";
+            }
+
+            return null;
+        }
+
+        return "UNKNOWN_MUTATION";
+    }
+
+    public static string? ResolvedEditCode(string? serverStatus) =>
+        serverStatus == IncidentStatuses.Resolved ? "RESOLVED" : null;
+
+    private static bool IsQueuedEdit(SyncOperationRequest? operation) =>
+        string.Equals(operation?.MutationType?.Trim(), "editIncident", StringComparison.Ordinal);
+
+    private static async Task<SyncPushItemResult> EditQueuedIncident(
+        SyncOperationRequest operation,
+        UserProfile user,
+        IncidentStore store,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var mutationId = operation.ClientMutationId!.Trim();
+        var incident = await store.FindIncidentAsync(operation.IncidentId!.Trim(), cancellationToken);
+        if (incident is null || !string.Equals(incident.ReporterId, user.Id, StringComparison.Ordinal))
+        {
+            return new SyncPushItemResult(mutationId, SyncResults.Conflict, null, "NOT_FOUND");
+        }
+
+        if (ResolvedEditCode(incident.Status) is not null)
+        {
+            logger.LogInformation(
+                "Sync edit kept status {Status} for incident {IncidentId}",
+                incident.Status,
+                incident.Id);
+            return new SyncPushItemResult(mutationId, SyncResults.Conflict, incident.Id, "RESOLVED");
+        }
+
+        var description = operation.Description!.Trim();
+        var wrote = await store.UpdateDescriptionAsync(incident.Id, description, cancellationToken);
+        if (!wrote)
+        {
+            var again = await store.FindIncidentAsync(incident.Id, cancellationToken);
+            if (again is not null && ResolvedEditCode(again.Status) is not null)
+            {
+                logger.LogInformation(
+                    "Sync edit kept status {Status} for incident {IncidentId}",
+                    again.Status,
+                    again.Id);
+                return new SyncPushItemResult(mutationId, SyncResults.Conflict, again.Id, "RESOLVED");
+            }
+
+            return new SyncPushItemResult(mutationId, SyncResults.Conflict, incident.Id, "NOT_FOUND");
+        }
+
+        logger.LogInformation("Sync edit stored for incident {IncidentId}", incident.Id);
+        return new SyncPushItemResult(mutationId, SyncResults.Ack, incident.Id, null);
     }
 
     private static CreateIncidentRequest ToCreateRequest(SyncOperationRequest operation) =>
@@ -1138,6 +1212,8 @@ public sealed class SyncOperationRequest
     public string? ClientMutationId { get; set; }
 
     public string? MutationType { get; set; }
+
+    public string? IncidentId { get; set; }
 
     public string? Category { get; set; }
 
