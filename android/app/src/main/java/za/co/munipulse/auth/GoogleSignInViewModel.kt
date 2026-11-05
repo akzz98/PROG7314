@@ -59,10 +59,19 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
 
     private val sessionStore = SessionStore(application)
     private val appLanguage = AppLanguage(application)
+    private val biometricStore = BiometricStore(application)
     private val onboardingStore = OnboardingStore(application)
     private val notificationStore = NotificationStore(application)
     private val _appliedLanguage = MutableStateFlow(appLanguage.read())
     val appliedLanguage: StateFlow<String> = _appliedLanguage.asStateFlow()
+    private val _biometricEnabled = MutableStateFlow(biometricStore.read())
+    val biometricEnabled: StateFlow<Boolean> = _biometricEnabled.asStateFlow()
+    private val _biometricUnlocked = MutableStateFlow(false)
+    val biometricUnlocked: StateFlow<Boolean> = _biometricUnlocked.asStateFlow()
+    private val _gateMessage = MutableStateFlow("")
+    val gateMessage: StateFlow<String> = _gateMessage.asStateFlow()
+    private val _gateWorking = MutableStateFlow(false)
+    val gateWorking: StateFlow<Boolean> = _gateWorking.asStateFlow()
     private var accessToken: String? = null
     private val profileMutex = Mutex()
 
@@ -199,6 +208,71 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         notificationStore.setPendingSync(true)
         requestProfileSync(pushLocal = true)
         return true
+    }
+
+    fun setBiometricEnabled(enabled: Boolean): Int? {
+        if (!enabled) {
+            biometricStore.save(false)
+            _biometricEnabled.value = false
+            Log.i(TAG, "Biometric unlock off")
+            return null
+        }
+        return when (BiometricUnlock.availability(getApplication())) {
+            BiometricAvailability.NoneEnrolled -> {
+                Log.i(TAG, "Biometric unlock refused. None enrolled")
+                R.string.biometric_settings_none
+            }
+            BiometricAvailability.Unavailable -> {
+                Log.i(TAG, "Biometric unlock refused. Unavailable")
+                R.string.biometric_settings_unavailable
+            }
+            BiometricAvailability.Ready -> {
+                biometricStore.save(true)
+                _biometricEnabled.value = true
+                _biometricUnlocked.value = true
+                Log.i(TAG, "Biometric unlock on")
+                null
+            }
+        }
+    }
+
+    fun unlockWithBiometric() {
+        _gateMessage.value = ""
+        _biometricUnlocked.value = true
+        Log.i(TAG, "Biometric gate unlocked")
+    }
+
+    fun setGateMessage(message: String) {
+        _gateMessage.value = message
+    }
+
+    fun confirmWithGoogle(activity: Activity) {
+        if (_gateWorking.value) {
+            return
+        }
+        viewModelScope.launch {
+            _gateWorking.value = true
+            _gateMessage.value = ""
+            try {
+                val previous = GoogleSignIn.currentUser(getApplication())?.uid
+                val user = GoogleSignIn.signIn(activity)
+                if (previous == null || user.uid != previous) {
+                    Log.i(TAG, "Google unlock opened a session")
+                    _state.value = sessionState(user)
+                } else {
+                    Log.i(TAG, "Google unlock matched the signed-in account")
+                }
+                _biometricUnlocked.value = true
+            } catch (cancelled: GetCredentialCancellationException) {
+                Log.i(TAG, "Google unlock cancelled")
+                _gateMessage.value = activity.getString(R.string.biometric_cancelled)
+            } catch (error: Exception) {
+                Log.e(TAG, "Google unlock failed: ${error.javaClass.simpleName}")
+                _gateMessage.value = activity.getString(R.string.biometric_google_failed)
+            } finally {
+                _gateWorking.value = false
+            }
+        }
     }
 
     fun updateDefaultWard(code: String) {
@@ -607,6 +681,9 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         _mine.value = MyIncidentsUi.Idle
         _mineStatus.value = null
         _detail.value = IncidentDetailUi.Idle
+        _biometricUnlocked.value = false
+        _gateMessage.value = ""
+        _gateWorking.value = false
         accessToken = null
         sessionStore.clear()
         notificationStore.setPendingSync(false)

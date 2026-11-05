@@ -56,6 +56,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.retrofit.gson)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.fragment)
+    implementation(libs.androidx.biometric)
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)

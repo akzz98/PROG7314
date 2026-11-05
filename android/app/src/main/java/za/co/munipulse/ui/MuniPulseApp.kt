@@ -25,6 +25,7 @@ import za.co.munipulse.ui.settings.LanguageScreen
 import za.co.munipulse.ui.settings.NotificationPreferencesScreen
 import za.co.munipulse.ui.settings.ProfileScreen
 import za.co.munipulse.ui.settings.SettingsScreen
+import za.co.munipulse.ui.login.BiometricGateScreen
 import za.co.munipulse.ui.splash.SplashScreen
 
 @Composable
@@ -54,6 +55,10 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     val upvoteBusy by viewModel.upvoteBusy.collectAsState()
     val hotspots by viewModel.hotspots.collectAsState()
     val nearby by viewModel.nearby.collectAsState()
+    val biometricEnabled by viewModel.biometricEnabled.collectAsState()
+    val biometricUnlocked by viewModel.biometricUnlocked.collectAsState()
+    val gateMessage by viewModel.gateMessage.collectAsState()
+    val gateWorking by viewModel.gateWorking.collectAsState()
     val showSplash = splashHold || state is SignInUiState.Checking || restoring
 
     LaunchedEffect(Unit) {
@@ -80,6 +85,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     LaunchedEffect(showSplash) {
         if (!showSplash) {
             val route = when {
+                state is SignInUiState.SignedIn && biometricEnabled && !biometricUnlocked && !showReport -> "biometric"
                 state is SignInUiState.SignedIn -> "home"
                 !onboardingDone -> "onboarding"
                 else -> "login"
@@ -101,6 +107,13 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
                 viewModel.clearNearby()
                 showReport = false
             },
+        )
+        current is SignInUiState.SignedIn && !showReport && biometricEnabled && !biometricUnlocked -> BiometricGateScreen(
+            working = gateWorking,
+            message = gateMessage,
+            onUnlocked = viewModel::unlockWithBiometric,
+            onUseGoogle = { viewModel.confirmWithGoogle(activity) },
+            onMessage = viewModel::setGateMessage,
         )
         current is SignInUiState.SignedIn && showProfile -> ProfileScreen(
             displayName = current.displayName,
@@ -133,6 +146,8 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             onWardSelected = viewModel::updateDefaultWard,
             onOpenLanguage = { showLanguage = true },
             onOpenNotifications = { showNotifications = true },
+            biometricEnabled = biometricEnabled,
+            onBiometricChange = viewModel::setBiometricEnabled,
             onSignOut = {
                 showSettings = false
                 showLanguage = false

@@ -3,14 +3,14 @@ package za.co.munipulse
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.fragment.app.FragmentActivity
 import za.co.munipulse.auth.AppLanguage
 import za.co.munipulse.ui.MuniPulseApp
 import za.co.munipulse.ui.theme.MuniPulseTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLanguage(newBase).wrap(newBase))
     }

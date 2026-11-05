@@ -24,6 +24,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,11 +48,14 @@ fun SettingsScreen(
     onWardSelected: (String) -> Unit,
     onOpenLanguage: () -> Unit,
     onOpenNotifications: () -> Unit,
+    biometricEnabled: Boolean,
+    onBiometricChange: (Boolean) -> Int?,
     onSignOut: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var wardMenuOpen by remember { mutableStateOf(false) }
+    var biometricNote by remember { mutableIntStateOf(0) }
     val ward = WardCatalog.all.firstOrNull { it.code == defaultWardCode }
 
     LaunchedEffect(Unit) {
@@ -138,10 +142,36 @@ fun SettingsScreen(
         OutlinedButton(onClick = onOpenNotifications, modifier = Modifier.fillMaxWidth()) {
             Text(text = stringResource(R.string.settings_notifications))
         }
-        FinalPoeSwitchRow(
-            title = stringResource(R.string.settings_biometric),
-            detail = stringResource(R.string.settings_final_poe),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = stringResource(R.string.settings_biometric), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = if (biometricNote != 0) {
+                        stringResource(biometricNote)
+                    } else {
+                        stringResource(
+                            if (biometricEnabled) R.string.biometric_on_detail else R.string.biometric_off_detail,
+                        )
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (biometricNote != 0) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+            Switch(
+                checked = biometricEnabled,
+                onCheckedChange = { enabled ->
+                    biometricNote = onBiometricChange(enabled) ?: 0
+                },
+            )
+        }
         FinalPoeRow(
             title = stringResource(R.string.settings_sync),
             detail = stringResource(R.string.settings_final_poe),
@@ -160,7 +190,7 @@ fun SettingsScreen(
     }
 }
 
-// FINAL POE: S12 biometric unlock and S13 sync centre stay closed until those milestones.
+// FINAL POE: S13 sync centre stays closed until offline sync.
 @Composable
 private fun FinalPoeRow(title: String, detail: String) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -170,25 +200,6 @@ private fun FinalPoeRow(title: String, detail: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun FinalPoeSwitchRow(title: String, detail: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = detail,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Switch(checked = false, onCheckedChange = null, enabled = false)
     }
 }
 

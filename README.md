@@ -47,7 +47,7 @@ flowchart TB
 
 Part 2 includes Google SSO, Settings, the custom API and database, and custom features UD-1 (photo + GPS), UD-2 (upvotes and ward aggregation), and UD-3 (resolution timeline).
 
-Final POE still to come: biometric unlock, Room offline sync, FCM, Azure Blob, the emergency map (UD-4), and impact scores (UD-5). English and isiZulu are in this build.
+Final POE still to come: Room offline sync, FCM, Azure Blob, the emergency map (UD-4), and impact scores (UD-5). English, isiZulu, and biometric unlock are in this build.
 
 ## Layout
 
@@ -196,7 +196,7 @@ When a session exists, the app calls `GET /api/v1/me`. Changing the ward or tick
 
 Settings opens notification preferences: ticket status and area emergencies start on, and marketing and news start off. Those three choices stay on the device. Push delivery is Final POE and is not implemented.
 
-Language opens from Settings and switches the app between English and isiZulu. Biometric unlock and the sync centre stay visible and marked **Coming in Final POE**. They do not open a fingerprint prompt or an offline queue.
+Language opens from Settings and switches the app between English and isiZulu. Biometric unlock can be turned on in Settings. A cold start then asks for a fingerprint or face before Home, with Google sign-in as the fallback. The sync centre stays visible and marked **Coming in Final POE**. It does not open an offline queue.
 
 Settings includes a POPIA-style privacy note: name, email, ward, location, and photos are kept only for this demo, and location and photos are used to report a fault.
 
