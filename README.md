@@ -14,7 +14,7 @@ A resident signs in with Google, reports a municipal fault with a photo and a GP
 | Session | Firebase Authentication with Google SSO, then an HMAC API JWT in encrypted preferences |
 | API | ASP.NET Core Web API on .NET 10 |
 | Database | MongoDB Atlas. Collections: `users`, `incidents`, `wards` |
-| Photos | JPEG multipart upload, stored by the API under `App_Data` |
+| Photos | JPEG upload through a 15-minute Azure Blob link |
 
 ## Architecture
 
@@ -38,8 +38,8 @@ flowchart TB
 
   SSO -->|Firebase ID token| Routes
   HTTP -->|Bearer API JWT| Routes
-  Routes --> Mongo[(MongoDB users incidents wards)]
-  Routes --> Disk[JPEG files in App_Data]
+  Routes --> Mongo[(MongoDB users incidents media)]
+  Routes --> Blob[Azure Blob incident JPEGs]
   Marker[Field-worker demo key] -->|milestones| Routes
 ```
 
@@ -47,7 +47,7 @@ flowchart TB
 
 Part 2 includes Google SSO, Settings, the custom API and database, and custom features UD-1 (photo + GPS), UD-2 (upvotes and ward aggregation), and UD-3 (resolution timeline).
 
-Final POE still to come: Room offline sync, FCM, Azure Blob, the emergency map (UD-4), and impact scores (UD-5). English, isiZulu, and biometric unlock are in this build.
+Final POE still to come: Room offline sync, FCM, the emergency map (UD-4), and impact scores (UD-5). English, isiZulu, biometric unlock, and Azure Blob photos are in this build.
 
 ## Layout
 
@@ -71,7 +71,7 @@ The API job uses the empty MongoDB connection string and the empty JWT signing k
 
 ## Setup
 
-Keep the Atlas connection string, the JWT signing key, the field-worker demo key, and `google-services.json` on your machine. The commands below use [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) for the API. You can use a gitignored `appsettings.Development.json` instead, copied from `api/MuniPulse.Api/appsettings.Development.json.example`.
+Keep the Atlas connection string, the Azure Storage connection string, the JWT signing key, the field-worker demo key, and `google-services.json` on your machine. The commands below use [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) for the API. You can use a gitignored `appsettings.Development.json` instead, copied from `api/MuniPulse.Api/appsettings.Development.json.example`.
 
 ### MongoDB
 
@@ -82,6 +82,14 @@ dotnet user-secrets set "MongoDb:ConnectionString" "<atlas-connection-string>" -
 ```
 
 On startup the API creates indexes and seeds wards `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, and `TSH-04`, plus the user `demo-field-worker`. With an empty connection string, `/health` still returns ok and data routes return `503 DATABASE_UNAVAILABLE`.
+
+### Azure Blob
+
+Photo bytes are stored in the container `incident-photos`. Leave the connection string empty until you have a storage account. A report with no photo still saves. A report with photos returns `503 STORAGE_UNAVAILABLE` and is not saved.
+
+```powershell
+dotnet user-secrets set "AzureBlob:ConnectionString" "<storage-connection-string>" --project api/MuniPulse.Api
+```
 
 ### JWT signing key
 
@@ -136,7 +144,7 @@ Requires the .NET 10 SDK.
 dotnet run --project api/MuniPulse.Api --launch-profile http
 ```
 
-`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, the 250 metre duplicate window, the field-worker demo key comparison, and unauthenticated calls. They do not need Firebase, MongoDB, or a JWT signing key. The API workflow runs the same command on every push.
+`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, SAS request validation, the 250 metre duplicate window, the field-worker demo key comparison, and unauthenticated calls. They do not need Firebase, MongoDB, Azure, or a JWT signing key. The API workflow runs the same command on every push.
 
 Health check: [http://localhost:5285/health](http://localhost:5285/health)
 
@@ -154,9 +162,8 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 | --- | --- | --- |
 | POST | `/api/v1/auth/session` | Firebase ID token in the body. The API checks it against Google's securetoken certificates, then returns an API JWT. |
 | GET, PATCH | `/api/v1/me` | Bearer API JWT |
-| POST, GET | `/api/v1/incidents` and `/api/v1/incidents/{id}` | Bearer API JWT |
-| POST | `/api/v1/incidents/photos` | Bearer API JWT. Multipart JPEG files, 1 to 3, each under 5 MB. Saved under `App_Data/incident-photos` on the API machine. |
-| GET | `/api/v1/incidents/photos/{id}` | Bearer API JWT. Returns that JPEG when it is still on disk. |
+| POST | `/api/v1/media/sas` | Bearer API JWT. Body is `contentType` (`image/jpeg`) and `byteSize` (1 to 5 MB). Returns `photoId`, `uploadUrl`, and `expiresAt`. The link lasts 15 minutes. The app uploads the JPEG to that URL. |
+| POST, GET | `/api/v1/incidents` and `/api/v1/incidents/{id}` | Bearer API JWT. Detail photos include a short-lived read URL when the blob is recorded. |
 | GET | `/api/v1/incidents/aggregates` | Bearer API JWT. Open reports in the ward, grouped when they share an `aggregateId`. |
 | GET | `/api/v1/incidents/nearby` | Bearer API JWT. Open reports in the same ward and category within 250 metres and 14 days. |
 | POST | `/api/v1/incidents/{id}/upvotes` | Bearer API JWT. One vote per user. |
@@ -170,7 +177,7 @@ A Development host with `Auth:AllowDevBypass` set to true accepts `firebaseIdTok
 
 Follow [Field-worker demo path](#field-worker-demo-path). The log records the user id. It does not record the token or the key.
 
-A new report joins an open report in the same ward and category when it is within 250 metres and 14 days. Both then share an `aggregateId`. Otherwise `aggregateId` stays null. A stored photo's `url` is `/api/v1/incidents/photos/{id}`. Azure Blob is Final POE. Sending the same `clientMutationId` again returns `409 DUPLICATE_MUTATION` and does not create a second incident.
+A new report joins an open report in the same ward and category when it is within 250 metres and 14 days. Both then share an `aggregateId`. Otherwise `aggregateId` stays null. A stored photo's `url` is a short-lived Azure read link. Sending the same `clientMutationId` again returns `409 DUPLICATE_MUTATION` and does not create a second incident.
 
 Sample calls are in `api/MuniPulse.Api/MuniPulse.Api.http`.
 
@@ -202,7 +209,7 @@ Settings includes a POPIA-style privacy note: name, email, ward, location, and p
 
 Settings opens Profile. That screen shows the name, masked email, default ward, language, and role. Impact score and badges are marked **Coming in Final POE** and are not shown.
 
-Home opens **New incident**. The form has a category (pothole, water leak, illegal dumping, streetlight, sewage, or other), a description, up to three photo previews from the camera or gallery, and a GPS line with **Refresh GPS**. Denying camera, gallery, or location stays on the screen and does not close the app. **Submit report** checks the category, a description of 10 to 1000 characters, a latitude and longitude, accuracy when a fix has one, the default ward, and a maximum of three photos. Invalid input stays on the screen. When a location is set, the form asks `GET /api/v1/incidents/nearby` and can expand **Nearby duplicates** with the category, a short place line, the upvote count, and the distance. A valid form uploads the photos as JPEG multipart, then `POST /api/v1/incidents` with a stable `clientMutationId`. A retry of that same form returns the already-submitted message instead of a second row. Logcat records permission results, create success or failure, and the accuracy in metres. It does not record the coordinates, the description, or a token.
+Home opens **New incident**. The form has a category (pothole, water leak, illegal dumping, streetlight, sewage, or other), a description, up to three photo previews from the camera or gallery, and a GPS line with **Refresh GPS**. Denying camera, gallery, or location stays on the screen and does not close the app. **Submit report** checks the category, a description of 10 to 1000 characters, a latitude and longitude, accuracy when a fix has one, the default ward, and a maximum of three photos. Invalid input stays on the screen. When a location is set, the form asks `GET /api/v1/incidents/nearby` and can expand **Nearby duplicates** with the category, a short place line, the upvote count, and the distance. A valid form asks for an upload link, puts each JPEG in Azure Blob, then `POST /api/v1/incidents` with a stable `clientMutationId`. If a photo upload fails, the form stays open and the incident is not created. A retry of that same form returns the already-submitted message instead of a second row. Logcat records permission results, the photo id, the upload status, create success or failure, and the accuracy in metres. It does not record the coordinates, the description, a token, or the upload link.
 
 Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
 

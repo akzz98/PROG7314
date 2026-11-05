@@ -41,7 +41,7 @@ data class IncidentDetailItem(
     val viewerHasUpvoted: Boolean,
     val grouped: Boolean = false,
     val upvoteNote: String = "",
-    val photoIds: List<String>,
+    val photos: List<IncidentPhoto>,
     val timeline: List<TimelineLine>,
 )
 
@@ -60,6 +60,8 @@ data class HotspotGroup(
     val incidentId: String,
     val rank: Int,
 )
+
+data class IncidentPhoto(val id: String, val url: String)
 
 data class TimelineLine(
     val at: String,

@@ -18,8 +18,7 @@ public static class ApiEndpoints
         api.MapGet("/me", GetMe).RequireAuthorization();
         api.MapPatch("/me", PatchMe).RequireAuthorization();
         api.MapPost("/incidents", CreateIncident).RequireAuthorization().RequireRateLimiting("writes");
-        api.MapPost("/incidents/photos", UploadPhotos).RequireAuthorization().RequireRateLimiting("writes").DisableAntiforgery();
-        api.MapGet("/incidents/photos/{id}", GetPhoto).RequireAuthorization();
+        api.MapPost("/media/sas", IssueMediaSas).RequireAuthorization().RequireRateLimiting("writes");
         api.MapGet("/incidents/aggregates", ListAggregates).RequireAuthorization();
         api.MapGet("/incidents/nearby", ListNearby).RequireAuthorization();
         api.MapGet("/incidents/{id}", GetIncident).RequireAuthorization();
@@ -152,6 +151,7 @@ public static class ApiEndpoints
         CreateIncidentRequest? request,
         HttpContext http,
         IncidentStore store,
+        BlobPhotos photos,
         ILogger<IncidentStore> logger,
         CancellationToken cancellationToken)
     {
@@ -191,6 +191,12 @@ public static class ApiEndpoints
                     "DUPLICATE_MUTATION",
                     "This report was already submitted.");
             }
+        }
+
+        var photoProblem = await RequireUploadedPhotos(request, user, photos, store, http, cancellationToken);
+        if (photoProblem is not null)
+        {
+            return photoProblem;
         }
 
         var now = DateTime.UtcNow;
@@ -267,11 +273,12 @@ public static class ApiEndpoints
             incident.CreatedAt));
     }
 
-    private static async Task<IResult> UploadPhotos(
-        HttpRequest request,
+    private static async Task<IResult> IssueMediaSas(
+        MediaSasRequest? request,
         HttpContext http,
-        PhotoStore photos,
+        BlobPhotos photos,
         IncidentStore store,
+        ILogger<IncidentStore> logger,
         CancellationToken cancellationToken)
     {
         var user = await RequireUserAsync(http, store, cancellationToken);
@@ -280,76 +287,115 @@ public static class ApiEndpoints
             return ApiErrors.Result(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Sign in is required.");
         }
 
-        if (!request.HasFormContentType)
+        if (request is null)
         {
-            return ApiErrors.Result(http, StatusCodes.Status400BadRequest, "VALIDATION_ERROR", "Send the photos as multipart form data.");
+            return ApiErrors.Result(http, StatusCodes.Status400BadRequest, "VALIDATION_ERROR", "A JSON body is required.");
         }
 
-        var form = await request.ReadFormAsync(cancellationToken);
-        if (form.Files.Count is < 1 or > 3)
+        var fields = BlobPhotos.ValidateSas(request.ContentType, request.ByteSize);
+        if (fields.Count > 0)
+        {
+            var failure = BlobPhotos.SasError(fields);
+            return ApiErrors.Result(http, failure.Status, failure.Code, failure.Message, fields);
+        }
+
+        if (!photos.IsConfigured)
         {
             return ApiErrors.Result(
                 http,
-                StatusCodes.Status400BadRequest,
-                "VALIDATION_ERROR",
-                "Attach 1 to 3 photos.",
-                new Dictionary<string, string> { ["photoIds"] = "Attach 1 to 3 photos." });
+                StatusCodes.Status503ServiceUnavailable,
+                "STORAGE_UNAVAILABLE",
+                "Photo storage is not configured. Set AzureBlob:ConnectionString in user-secrets.");
         }
 
-        var accepted = new List<byte[]>(form.Files.Count);
-        foreach (var file in form.Files)
+        var photoId = Guid.NewGuid().ToString("N");
+        var lease = await photos.IssueUploadAsync(photoId, cancellationToken);
+        if (lease is null)
         {
-            if (file.Length is <= 0 or > PhotoStore.MaxBytes)
-            {
-                return ApiErrors.Result(
-                    http,
-                    StatusCodes.Status400BadRequest,
-                    "VALIDATION_ERROR",
-                    "Each photo must be a JPEG under 5 MB.",
-                    new Dictionary<string, string> { ["photoIds"] = "Each photo must be a JPEG under 5 MB." });
-            }
-
-            await using var stream = file.OpenReadStream();
-            using var buffer = new MemoryStream();
-            await stream.CopyToAsync(buffer, cancellationToken);
-            var bytes = buffer.ToArray();
-            if (!PhotoStore.IsJpeg(bytes))
-            {
-                return ApiErrors.Result(
-                    http,
-                    StatusCodes.Status400BadRequest,
-                    "VALIDATION_ERROR",
-                    "Each photo must be a JPEG under 5 MB.",
-                    new Dictionary<string, string> { ["photoIds"] = "Each photo must be a JPEG under 5 MB." });
-            }
-
-            accepted.Add(bytes);
+            return ApiErrors.Result(
+                http,
+                StatusCodes.Status503ServiceUnavailable,
+                "STORAGE_UNAVAILABLE",
+                "Photo storage could not issue an upload link.");
         }
 
-        var ids = await photos.SaveJpegsAsync(accepted, cancellationToken);
-        return Results.Ok(new PhotoUploadResponse(ids.ToArray()));
+        await store.InsertMediaAsync(
+            new MediaAsset
+            {
+                Id = photoId,
+                BlobContainer = photos.ContainerName,
+                BlobName = BlobPhotos.BlobNameFor(photoId),
+                ContentType = BlobPhotos.JpegContentType,
+                ByteSize = request.ByteSize!.Value,
+                CreatedBy = user.Id,
+                CreatedAt = DateTime.UtcNow,
+            },
+            cancellationToken);
+        logger.LogInformation("Media record stored for photo {PhotoId}.", photoId);
+        return Results.Ok(new MediaSasResponse(photoId, lease.UploadUrl, lease.ExpiresAt));
     }
 
-    private static async Task<IResult> GetPhoto(
-        string id,
-        HttpContext http,
-        PhotoStore photos,
+    private static async Task<IResult?> RequireUploadedPhotos(
+        CreateIncidentRequest request,
+        UserProfile user,
+        BlobPhotos photos,
         IncidentStore store,
+        HttpContext http,
         CancellationToken cancellationToken)
     {
-        var user = await RequireUserAsync(http, store, cancellationToken);
-        if (user is null)
+        var ids = (request.PhotoIds ?? [])
+            .Select(photo => photo.Trim())
+            .Where(photo => photo.Length > 0)
+            .ToList();
+        if (ids.Count == 0)
         {
-            return ApiErrors.Result(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Sign in is required.");
+            return null;
         }
 
-        var path = photos.FileFor(id);
-        if (path is null)
+        if (!photos.IsConfigured)
         {
-            return ApiErrors.Result(http, StatusCodes.Status404NotFound, "NOT_FOUND", "That photo was not found.");
+            return ApiErrors.Result(
+                http,
+                StatusCodes.Status503ServiceUnavailable,
+                "STORAGE_UNAVAILABLE",
+                "Photo storage is not configured. Set AzureBlob:ConnectionString in user-secrets.");
         }
 
-        return Results.File(path, "image/jpeg");
+        foreach (var id in ids)
+        {
+            var media = BlobPhotos.IsPhotoId(id) ? await store.FindMediaAsync(id, cancellationToken) : null;
+            if (media is null || !string.Equals(media.CreatedBy, user.Id, StringComparison.Ordinal))
+            {
+                return ApiErrors.Result(
+                    http,
+                    StatusCodes.Status400BadRequest,
+                    "VALIDATION_ERROR",
+                    "One or more fields are invalid.",
+                    new Dictionary<string, string> { ["photoIds"] = "Upload each photo before submitting." });
+            }
+
+            var check = await photos.ExistsAsync(media.BlobName, cancellationToken);
+            if (check == BlobCheck.Unavailable)
+            {
+                return ApiErrors.Result(
+                    http,
+                    StatusCodes.Status503ServiceUnavailable,
+                    "STORAGE_UNAVAILABLE",
+                    "Photo storage could not be reached.");
+            }
+
+            if (check == BlobCheck.Missing)
+            {
+                return ApiErrors.Result(
+                    http,
+                    StatusCodes.Status400BadRequest,
+                    "VALIDATION_ERROR",
+                    "One or more fields are invalid.",
+                    new Dictionary<string, string> { ["photoIds"] = "Upload each photo before submitting." });
+            }
+        }
+
+        return null;
     }
 
     private static async Task<IResult> ListAggregates(
@@ -452,7 +498,7 @@ public static class ApiEndpoints
         string id,
         HttpContext http,
         IncidentStore store,
-        PhotoStore photos,
+        BlobPhotos photos,
         CancellationToken cancellationToken)
     {
         var user = await RequireUserAsync(http, store, cancellationToken);
@@ -467,7 +513,14 @@ public static class ApiEndpoints
             return ApiErrors.Result(http, StatusCodes.Status404NotFound, "NOT_FOUND", "That incident does not exist.");
         }
 
-        return Results.Ok(ToDetail(incident, user.Id, photos));
+        var links = new List<PhotoLink>(incident.PhotoIds.Count);
+        foreach (var photoId in incident.PhotoIds)
+        {
+            var media = await store.FindMediaAsync(photoId, cancellationToken);
+            links.Add(new PhotoLink(photoId, media is null ? null : photos.ReadUrl(media.BlobName)));
+        }
+
+        return Results.Ok(ToDetail(incident, user.Id, links));
     }
 
     private static async Task<IResult> ListIncidents(
@@ -853,7 +906,7 @@ public static class ApiEndpoints
             incident.CreatedAt,
             incident.UpvotedBy.Contains(viewerId));
 
-    private static IncidentDetail ToDetail(IncidentReport incident, string viewerId, PhotoStore photos) =>
+    private static IncidentDetail ToDetail(IncidentReport incident, string viewerId, IReadOnlyList<PhotoLink> photos) =>
         new(
             incident.Id,
             incident.Category,
@@ -866,9 +919,7 @@ public static class ApiEndpoints
             incident.UpvoteCount,
             incident.AggregateId,
             incident.UpvotedBy.Contains(viewerId),
-            incident.PhotoIds.Select(photo => new PhotoLink(
-                photo,
-                photos.FileFor(photo) is null ? null : $"/api/v1/incidents/photos/{photo}")).ToArray(),
+            photos.ToArray(),
             incident.Timeline
                 .OrderBy(entry => entry.At)
                 .Select(ToTimeline)
@@ -939,7 +990,14 @@ public sealed record UserResponse(
 
 public sealed record NotificationResponse(bool TicketStatus, bool AreaEmergencies);
 
-public sealed record PhotoUploadResponse(string[] PhotoIds);
+public sealed class MediaSasRequest
+{
+    public string? ContentType { get; set; }
+
+    public long? ByteSize { get; set; }
+}
+
+public sealed record MediaSasResponse(string PhotoId, string UploadUrl, DateTimeOffset ExpiresAt);
 
 public sealed record CreateIncidentResponse(
     string Id,

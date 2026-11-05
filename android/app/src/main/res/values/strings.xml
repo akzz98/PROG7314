@@ -107,6 +107,7 @@
     <string name="report_duplicate">This report was already submitted.</string>
     <string name="report_send_failed">The report was not sent. Try again.</string>
     <string name="report_photo_failed">A photo could not be prepared.</string>
+    <string name="report_photo_upload">A photo could not be uploaded. The report was not sent.</string>
     <string name="report_auth">Sign in again before sending.</string>
     <string name="validation_summary">Fix the fields above before sending.</string>
     <string name="validation_category">Choose a category such as Pothole.</string>

@@ -32,6 +32,24 @@ public sealed class UserProfile
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+public sealed class MediaAsset
+{
+    [BsonId]
+    public string Id { get; set; } = "";
+
+    public string BlobContainer { get; set; } = "";
+
+    public string BlobName { get; set; } = "";
+
+    public string ContentType { get; set; } = "";
+
+    public long ByteSize { get; set; }
+
+    public string CreatedBy { get; set; } = "";
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 public sealed class NotificationPreferences
 {
     public bool TicketStatus { get; set; } = true;

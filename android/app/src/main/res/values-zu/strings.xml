@@ -107,6 +107,7 @@
     <string name="report_duplicate">Lo mbiko usuvele wathunyelwa.</string>
     <string name="report_send_failed">Umbiko awuthunyelwanga. Zama futhi.</string>
     <string name="report_photo_failed">Isithombe asilungiselelwanga.</string>
+    <string name="report_photo_upload">Isithombe asilayishwanga. Umbiko awuthunyelwanga.</string>
     <string name="report_auth">Ngena futhi ngaphambi kokuthumela.</string>
     <string name="validation_summary">Lungisa izinkambu ezingenhla ngaphambi kokuthumela.</string>
     <string name="validation_category">Khetha isigaba, njengembobo emgwaqweni.</string>

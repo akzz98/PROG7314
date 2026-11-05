@@ -27,6 +27,7 @@ import za.co.munipulse.ui.home.WardPulseUi
 import za.co.munipulse.ui.incidents.HotspotGroup
 import za.co.munipulse.ui.incidents.IncidentDetailItem
 import za.co.munipulse.ui.incidents.IncidentDetailUi
+import za.co.munipulse.ui.incidents.IncidentPhoto
 import za.co.munipulse.ui.incidents.MyIncidentItem
 import za.co.munipulse.ui.incidents.MyIncidentsUi
 import za.co.munipulse.ui.incidents.IncidentTime
@@ -435,9 +436,9 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                     upvoteCount = body.upvoteCount,
                     viewerHasUpvoted = body.viewerHasUpvoted,
                     grouped = !body.aggregateId.isNullOrBlank(),
-                    photoIds = body.photos.orEmpty()
+                    photos = body.photos.orEmpty()
                         .filter { it.id.isNotBlank() && !it.url.isNullOrBlank() }
-                        .map { it.id },
+                        .map { IncidentPhoto(it.id, it.url!!) },
                     timeline = body.timeline.orEmpty()
                         .map { event ->
                             TimelineLine(
@@ -651,19 +652,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    suspend fun loadPhotoJpeg(photoId: String): ByteArray? {
-        val token = accessToken
-        if (token.isNullOrBlank()) {
-            Log.w(TAG, "Incident photo skipped. No API session")
-            return null
-        }
-        return try {
-            IncidentClient.photoJpeg(token, photoId)
-        } catch (error: Exception) {
-            Log.e(TAG, "Incident photo failed: ${error.javaClass.simpleName}")
-            null
-        }
-    }
+    suspend fun loadPhotoJpeg(url: String): ByteArray? = IncidentClient.photoJpeg(url)
 
     fun signOut() {
         pulseGeneration++
@@ -888,7 +877,11 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         } catch (error: Exception) {
             val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
             Log.e(TAG, "Incident create failed: $reason")
-            failed(R.string.report_send_failed)
+            val message = when (reason) {
+                "UPLOAD_FAILED", "STORAGE_UNAVAILABLE", "PAYLOAD_TOO_LARGE" -> R.string.report_photo_upload
+                else -> R.string.report_send_failed
+            }
+            failed(message)
         }
     }
 

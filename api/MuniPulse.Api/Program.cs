@@ -15,11 +15,7 @@ builder.Services.Configure<JsonOptions>(options =>
     options.SerializerOptions.PropertyNameCaseInsensitive = true;
 });
 builder.Services.AddSingleton<IncidentStore>();
-builder.Services.AddSingleton<PhotoStore>();
-builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
-{
-    options.MultipartBodyLengthLimit = PhotoStore.MaxBytes * 3L;
-});
+builder.Services.AddSingleton<BlobPhotos>();
 builder.AddApiAuth();
 builder.Services.AddRateLimiter(options =>
 {
@@ -130,11 +126,13 @@ app.MapGet("/health", () => Results.Ok(new HealthResponse("ok", "MuniPulse SA"))
 app.MapMuniPulseApi();
 
 var store = app.Services.GetRequiredService<IncidentStore>();
+var photos = app.Services.GetRequiredService<BlobPhotos>();
 var bypass = app.Services.GetRequiredService<DevBypassIdTokenVerifier>();
 var jwt = app.Services.GetRequiredService<JwtSettings>();
 app.Logger.LogInformation(
-    "MuniPulse SA API starting. Mongo configured: {MongoConfigured}. Dev session bypass: {DevBypass}. JWT configured: {JwtConfigured}. Field worker key configured: {FieldWorkerKeyConfigured}",
+    "MuniPulse SA API starting. Mongo configured: {MongoConfigured}. Blob configured: {BlobConfigured}. Dev session bypass: {DevBypass}. JWT configured: {JwtConfigured}. Field worker key configured: {FieldWorkerKeyConfigured}",
     store.IsConfigured,
+    photos.IsConfigured,
     bypass?.IsActive == true,
     jwt.IsConfigured,
     !string.IsNullOrWhiteSpace(app.Configuration["FieldWorker:DemoApiKey"]));

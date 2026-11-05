@@ -1,8 +1,11 @@
 package za.co.munipulse.auth
 
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Response
 import retrofit2.Retrofit
@@ -10,39 +13,54 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
-import retrofit2.http.Multipart
 import retrofit2.http.POST
-import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 import za.co.munipulse.BuildConfig
 
-// Uploads JPEG parts, then posts the incident. The bearer token is never logged.
+// Asks the API for a short-lived upload link, then puts the JPEG on that link.
+// The bearer token and the link are never logged.
 object IncidentClient {
+    private val http = OkHttpClient.Builder().build()
+
     private val api: IncidentApi by lazy {
         Retrofit.Builder()
             .baseUrl(BuildConfig.API_BASE_URL)
-            .client(OkHttpClient.Builder().build())
+            .client(http)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(IncidentApi::class.java)
     }
 
     suspend fun uploadPhotos(accessToken: String, files: List<ByteArray>): List<String> {
-        val parts = files.mapIndexed { index, bytes ->
-            MultipartBody.Part.createFormData(
-                "files",
-                "photo-$index.jpg",
-                bytes.toRequestBody("image/jpeg".toMediaType()),
+        val ids = ArrayList<String>(files.size)
+        for (bytes in files) {
+            if (bytes.size !in 3..MAX_JPEG || !isJpeg(bytes)) {
+                throw IncidentRequestException("UPLOAD_FAILED", "The photo was not a JPEG.")
+            }
+            val response = api.mediaSas(
+                bearer(accessToken),
+                MediaSasBody(contentType = "image/jpeg", byteSize = bytes.size.toLong()),
             )
-        }
-        val response = api.upload(bearer(accessToken), parts)
-        if (!response.isSuccessful) {
-            throw incidentError(response)
-        }
-        val ids = response.body()?.photoIds.orEmpty()
-        if (ids.size != files.size || ids.any { it.isBlank() }) {
-            throw IncidentRequestException("UPLOAD_FAILED", "The photo upload did not return ids.")
+            if (!response.isSuccessful) {
+                throw incidentError(response)
+            }
+            val lease = response.body()
+                ?: throw IncidentRequestException("UPLOAD_FAILED", "The photo upload did not return an id.")
+            if (!PHOTO_ID.matches(lease.photoId) || !lease.uploadUrl.startsWith("https://")) {
+                throw IncidentRequestException("UPLOAD_FAILED", "The photo upload did not return an id.")
+            }
+            val status = try {
+                putBlob(lease.uploadUrl, bytes)
+            } catch (error: Exception) {
+                Log.e(PHOTO_TAG, "Photo upload ${lease.photoId} failed: ${error.javaClass.simpleName}")
+                throw IncidentRequestException("UPLOAD_FAILED", "The photo upload was rejected.")
+            }
+            Log.i(PHOTO_TAG, "Photo upload ${lease.photoId} status $status")
+            if (status !in 200..299) {
+                throw IncidentRequestException("UPLOAD_FAILED", "The photo upload was rejected.")
+            }
+            ids += lease.photoId
         }
         return ids
     }
@@ -112,21 +130,42 @@ object IncidentClient {
         return response.body() ?: throw IncidentRequestException("EMPTY", "The incident response was empty.")
     }
 
-    suspend fun photoJpeg(accessToken: String, photoId: String): ByteArray? {
-        if (!PHOTO_ID.matches(photoId)) {
+    suspend fun photoJpeg(url: String): ByteArray? {
+        if (!url.startsWith("https://")) {
             return null
         }
-        val response = api.photo(bearer(accessToken), photoId)
-        if (!response.isSuccessful) {
-            return null
+        return try {
+            withContext(Dispatchers.IO) {
+                val request = Request.Builder().url(url).get().build()
+                http.newCall(request).execute().use { response ->
+                    Log.i(PHOTO_TAG, "Photo read status ${response.code}")
+                    if (!response.isSuccessful) {
+                        return@withContext null
+                    }
+                    val bytes = response.body?.bytes() ?: return@withContext null
+                    if (isJpeg(bytes) && bytes.size <= MAX_JPEG) bytes else null
+                }
+            }
+        } catch (error: Exception) {
+            Log.e(PHOTO_TAG, "Photo read failed: ${error.javaClass.simpleName}")
+            null
         }
-        val bytes = response.body()?.bytes() ?: return null
-        val jpeg = bytes.size in 3..MAX_JPEG &&
+    }
+
+    private suspend fun putBlob(uploadUrl: String, bytes: ByteArray): Int = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(uploadUrl)
+            .put(bytes.toRequestBody("image/jpeg".toMediaType()))
+            .header("x-ms-blob-type", "BlockBlob")
+            .build()
+        http.newCall(request).execute().use { response -> response.code }
+    }
+
+    private fun isJpeg(bytes: ByteArray): Boolean =
+        bytes.size >= 3 &&
             bytes[0] == 0xFF.toByte() &&
             bytes[1] == 0xD8.toByte() &&
             bytes[2] == 0xFF.toByte()
-        return if (jpeg) bytes else null
-    }
 
     private suspend fun list(
         accessToken: String,
@@ -168,17 +207,11 @@ object IncidentClient {
 
     private const val PAGE = 50
     private const val MAX_JPEG = 5_000_000
+    private const val PHOTO_TAG = "MuniPulsePhotos"
     private val PHOTO_ID = Regex("^[0-9a-fA-F]{32}$")
 }
 
 private interface IncidentApi {
-    @Multipart
-    @POST("api/v1/incidents/photos")
-    suspend fun upload(
-        @Header("Authorization") authorization: String,
-        @Part files: List<MultipartBody.Part>,
-    ): Response<PhotoUploadResponse>
-
     @POST("api/v1/incidents")
     suspend fun create(
         @Header("Authorization") authorization: String,
@@ -221,14 +254,20 @@ private interface IncidentApi {
         @Path("id") id: String,
     ): Response<IncidentDetailBody>
 
-    @GET("api/v1/incidents/photos/{id}")
-    suspend fun photo(
+    @POST("api/v1/media/sas")
+    suspend fun mediaSas(
         @Header("Authorization") authorization: String,
-        @Path("id") id: String,
-    ): Response<okhttp3.ResponseBody>
+        @Body body: MediaSasBody,
+    ): Response<MediaSasResponse>
 }
 
-data class PhotoUploadResponse(val photoIds: List<String> = emptyList())
+data class MediaSasBody(val contentType: String, val byteSize: Long)
+
+data class MediaSasResponse(
+    val photoId: String = "",
+    val uploadUrl: String = "",
+    val expiresAt: String = "",
+)
 
 data class CreateIncidentBody(
     val category: String,

@@ -124,14 +124,14 @@ private fun DetailBody(
         Spacer(modifier = Modifier.height(12.dp))
         Text(text = item.description, style = MaterialTheme.typography.bodyLarge)
     }
-    if (item.photoIds.isNotEmpty()) {
+    if (item.photos.isNotEmpty()) {
         Spacer(modifier = Modifier.height(12.dp))
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item.photoIds.forEach { photoId ->
-                DetailPhoto(photoId, onLoadPhoto)
+            item.photos.forEach { photo ->
+                DetailPhoto(photo.url, onLoadPhoto)
             }
         }
     }
@@ -171,11 +171,11 @@ private fun DetailBody(
 }
 
 @Composable
-private fun DetailPhoto(photoId: String, onLoadPhoto: suspend (String) -> ByteArray?) {
-    var bitmap by remember(photoId) { mutableStateOf<Bitmap?>(null) }
-    var failed by remember(photoId) { mutableStateOf(false) }
-    LaunchedEffect(photoId) {
-        val bytes = onLoadPhoto(photoId)
+private fun DetailPhoto(url: String, onLoadPhoto: suspend (String) -> ByteArray?) {
+    var bitmap by remember(url) { mutableStateOf<Bitmap?>(null) }
+    var failed by remember(url) { mutableStateOf(false) }
+    LaunchedEffect(url) {
+        val bytes = onLoadPhoto(url)
         val decoded = if (bytes == null) null else withContext(Dispatchers.IO) { PhotoFiles.thumbnail(bytes) }
         bitmap = decoded
         failed = decoded == null

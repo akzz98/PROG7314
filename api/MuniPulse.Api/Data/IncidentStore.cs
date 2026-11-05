@@ -10,6 +10,7 @@ public sealed class IncidentStore
     private readonly IMongoCollection<UserProfile>? _users;
     private readonly IMongoCollection<IncidentReport>? _incidents;
     private readonly IMongoCollection<WardDocument>? _wards;
+    private readonly IMongoCollection<MediaAsset>? _media;
     private readonly ILogger<IncidentStore> _logger;
 
     public IncidentStore(IConfiguration configuration, ILogger<IncidentStore> logger)
@@ -36,6 +37,7 @@ public sealed class IncidentStore
             _users = database.GetCollection<UserProfile>("users");
             _incidents = database.GetCollection<IncidentReport>("incidents");
             _wards = database.GetCollection<WardDocument>("wards");
+            _media = database.GetCollection<MediaAsset>("media");
         }
         catch (Exception ex) when (ex is FormatException or ArgumentException)
         {
@@ -172,6 +174,35 @@ public sealed class IncidentStore
             return await Incidents()
                 .Find(incident => incident.ReporterId == reporterId && incident.ClientMutationId == clientMutationId)
                 .FirstOrDefaultAsync(cancellationToken);
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
+    }
+
+    public async Task InsertMediaAsync(MediaAsset asset, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Media().InsertOneAsync(asset, cancellationToken: cancellationToken);
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
+    }
+
+    public async Task<MediaAsset?> FindMediaAsync(string id, CancellationToken cancellationToken)
+    {
+        if (!BlobPhotos.IsPhotoId(id))
+        {
+            return null;
+        }
+
+        try
+        {
+            return await Media().Find(asset => asset.Id == id).FirstOrDefaultAsync(cancellationToken);
         }
         catch (MongoException ex)
         {
@@ -483,6 +514,9 @@ public sealed class IncidentStore
 
     private IMongoCollection<UserProfile> Users() =>
         _users ?? throw NotConfigured();
+
+    private IMongoCollection<MediaAsset> Media() =>
+        _media ?? throw NotConfigured();
 
     private IMongoCollection<IncidentReport> Incidents() =>
         _incidents ?? throw NotConfigured();
