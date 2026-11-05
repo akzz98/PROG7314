@@ -21,6 +21,8 @@ import za.co.munipulse.data.LocalSettingsMirror
 import za.co.munipulse.data.MuniPulseDatabase
 import za.co.munipulse.data.QueuedIncident
 import za.co.munipulse.data.QueuedPhotos
+import za.co.munipulse.data.SyncAttempt
+import za.co.munipulse.data.SyncStatus
 import za.co.munipulse.report.IncidentDraft
 import za.co.munipulse.report.IncidentSubmitResult
 import za.co.munipulse.report.IncidentValidator
@@ -79,6 +81,8 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     val gateMessage: StateFlow<String> = _gateMessage.asStateFlow()
     private val _gateWorking = MutableStateFlow(false)
     val gateWorking: StateFlow<Boolean> = _gateWorking.asStateFlow()
+    private val _syncCentre = MutableStateFlow<SyncCentreUi>(SyncCentreUi.Loading)
+    val syncCentre: StateFlow<SyncCentreUi> = _syncCentre.asStateFlow()
     private var accessToken: String? = null
     private val profileMutex = Mutex()
 
@@ -664,6 +668,101 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    fun refreshSyncCentre() {
+        viewModelScope.launch {
+            publishSyncCentre(note = currentSyncNote(), busy = false)
+        }
+    }
+
+    fun retryQueued(id: String) {
+        viewModelScope.launch {
+            publishSyncCentre(note = currentSyncNote(), busy = true)
+            try {
+                val database = MuniPulseDatabase.get(getApplication())
+                val row = database.pendingSync().list().firstOrNull { it.id == id }
+                if (row != null) {
+                    val online = DeviceNetwork.isOnline(getApplication())
+                    val updated = SyncAttempt.retry(row, online)
+                    if (updated != row) {
+                        database.pendingSync().upsert(updated)
+                        Log.i(TAG, "Queued retry ${updated.id}. Count ${updated.retryCount}")
+                    }
+                }
+                publishSyncCentre(note = syncNote(DeviceNetwork.isOnline(getApplication())), busy = false)
+            } catch (error: Exception) {
+                Log.e(TAG, "Sync centre retry failed: ${error.javaClass.simpleName}")
+                publishSyncCentre(note = syncFailedNote(), busy = false)
+            }
+        }
+    }
+
+    fun syncQueuedNow() {
+        viewModelScope.launch {
+            publishSyncCentre(note = currentSyncNote(), busy = true)
+            try {
+                val online = DeviceNetwork.isOnline(getApplication())
+                val database = MuniPulseDatabase.get(getApplication())
+                val pending = database.pendingSync().list().filter { it.status == SyncStatus.PENDING }
+                pending.forEach { row ->
+                    database.pendingSync().upsert(SyncAttempt.retry(row, online))
+                }
+                Log.i(TAG, "Sync now recorded ${pending.size} queued reports. Online $online")
+                publishSyncCentre(note = syncNote(online), busy = false)
+            } catch (error: Exception) {
+                Log.e(TAG, "Sync now failed: ${error.javaClass.simpleName}")
+                publishSyncCentre(note = syncFailedNote(), busy = false)
+            }
+        }
+    }
+
+    private suspend fun publishSyncCentre(note: String, busy: Boolean) {
+        try {
+            val database = MuniPulseDatabase.get(getApplication())
+            val settings = database.localSettings().read()
+            val items = database.pendingSync().list().map { row ->
+                QueuedReportRow(
+                    id = row.id,
+                    category = queuedCategory(row.payloadJson),
+                    status = row.status,
+                    retryCount = row.retryCount,
+                    errorCode = row.lastError,
+                )
+            }
+            _syncCentre.value = SyncCentreUi.Ready(
+                lastSyncAt = settings?.lastSyncAt,
+                items = items,
+                note = note,
+                busy = busy,
+            )
+            Log.i(TAG, "Sync centre loaded ${items.size} queued reports")
+        } catch (error: Exception) {
+            Log.e(TAG, "Sync centre load failed: ${error.javaClass.simpleName}")
+            _syncCentre.value = SyncCentreUi.Failed(syncFailedNote())
+        }
+    }
+
+    private fun queuedCategory(payloadJson: String): String {
+        return try {
+            QueuedIncident.readPayload(payloadJson).category
+        } catch (error: Exception) {
+            Log.e(TAG, "Queued report could not be read: ${error.javaClass.simpleName}")
+            ""
+        }
+    }
+
+    private fun currentSyncNote(): String {
+        val ready = _syncCentre.value as? SyncCentreUi.Ready
+        return ready?.note.orEmpty()
+    }
+
+    private fun syncNote(online: Boolean): String {
+        val resources = getApplication<Application>().resources
+        return resources.getString(if (online) R.string.sync_waiting else R.string.sync_offline)
+    }
+
+    private fun syncFailedNote(): String =
+        getApplication<Application>().getString(R.string.sync_failed)
+
     suspend fun loadPhotoJpeg(url: String): ByteArray? = IncidentClient.photoJpeg(url)
 
     fun signOut() {
@@ -685,6 +784,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         _biometricUnlocked.value = false
         _gateMessage.value = ""
         _gateWorking.value = false
+        _syncCentre.value = SyncCentreUi.Loading
         accessToken = null
         sessionStore.clear()
         notificationStore.setPendingSync(false)

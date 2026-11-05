@@ -25,6 +25,7 @@ import za.co.munipulse.ui.settings.LanguageScreen
 import za.co.munipulse.ui.settings.NotificationPreferencesScreen
 import za.co.munipulse.ui.settings.ProfileScreen
 import za.co.munipulse.ui.settings.SettingsScreen
+import za.co.munipulse.ui.settings.SyncCentreScreen
 import za.co.munipulse.ui.login.BiometricGateScreen
 import za.co.munipulse.ui.splash.SplashScreen
 
@@ -32,6 +33,7 @@ import za.co.munipulse.ui.splash.SplashScreen
 fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     var splashHold by rememberSaveable { mutableStateOf(true) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showSync by rememberSaveable { mutableStateOf(false) }
     var showLanguage by rememberSaveable { mutableStateOf(false) }
     var showNotifications by rememberSaveable { mutableStateOf(false) }
     var showProfile by rememberSaveable { mutableStateOf(false) }
@@ -59,6 +61,7 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
     val biometricUnlocked by viewModel.biometricUnlocked.collectAsState()
     val gateMessage by viewModel.gateMessage.collectAsState()
     val gateWorking by viewModel.gateWorking.collectAsState()
+    val syncCentre by viewModel.syncCentre.collectAsState()
     val showSplash = splashHold || state is SignInUiState.Checking || restoring
 
     LaunchedEffect(Unit) {
@@ -136,6 +139,13 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             onChange = viewModel::updateNotifications,
             onBack = { showNotifications = false },
         )
+        current is SignInUiState.SignedIn && showSync -> SyncCentreScreen(
+            centre = syncCentre,
+            onRefresh = viewModel::refreshSyncCentre,
+            onRetry = viewModel::retryQueued,
+            onSyncNow = viewModel::syncQueuedNow,
+            onBack = { showSync = false },
+        )
         current is SignInUiState.SignedIn && showSettings -> SettingsScreen(
             displayName = current.displayName,
             email = current.email,
@@ -148,8 +158,10 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             onOpenNotifications = { showNotifications = true },
             biometricEnabled = biometricEnabled,
             onBiometricChange = viewModel::setBiometricEnabled,
+            onOpenSync = { showSync = true },
             onSignOut = {
                 showSettings = false
+                showSync = false
                 showLanguage = false
                 showNotifications = false
                 showProfile = false

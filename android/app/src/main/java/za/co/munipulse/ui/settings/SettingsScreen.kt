@@ -50,6 +50,7 @@ fun SettingsScreen(
     onOpenNotifications: () -> Unit,
     biometricEnabled: Boolean,
     onBiometricChange: (Boolean) -> Int?,
+    onOpenSync: () -> Unit,
     onSignOut: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -172,10 +173,9 @@ fun SettingsScreen(
                 },
             )
         }
-        FinalPoeRow(
-            title = stringResource(R.string.settings_sync),
-            detail = stringResource(R.string.settings_final_poe),
-        )
+        OutlinedButton(onClick = onOpenSync, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(R.string.settings_sync))
+        }
         Spacer(modifier = Modifier.height(16.dp))
         Text(text = stringResource(R.string.settings_privacy_title), style = MaterialTheme.typography.titleMedium)
         Text(
@@ -187,19 +187,6 @@ fun SettingsScreen(
         Button(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
             Text(text = stringResource(R.string.sign_out))
         }
-    }
-}
-
-// FINAL POE: S13 sync centre stays closed until offline sync.
-@Composable
-private fun FinalPoeRow(title: String, detail: String) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(text = title, style = MaterialTheme.typography.titleMedium)
-        Text(
-            text = detail,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
