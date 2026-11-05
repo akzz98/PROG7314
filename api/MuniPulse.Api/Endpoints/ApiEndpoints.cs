@@ -340,7 +340,11 @@ public static class ApiEndpoints
             var existing = await store.FindByMutationAsync(user.Id, mutationId, cancellationToken);
             if (existing is not null)
             {
-                results[index] = new SyncPushItemResult(mutationId, SyncResults.Conflict, existing.Id, "DUPLICATE_MUTATION");
+                results[index] = new SyncPushItemResult(mutationId, SyncResults.Ack, existing.Id, "DUPLICATE_MUTATION");
+                logger.LogInformation(
+                    "Sync item already stored for mutation {MutationId}. Incident {IncidentId}",
+                    mutationId,
+                    existing.Id);
                 continue;
             }
 
@@ -351,8 +355,25 @@ public static class ApiEndpoints
         {
             var operation = operations[index];
             var mutationId = operation.ClientMutationId!.Trim();
-            var incident = await SaveNewIncident(ToCreateRequest(operation), user, store, logger, mutationId, cancellationToken);
-            results[index] = new SyncPushItemResult(mutationId, SyncResults.Ack, incident.Id, null);
+            try
+            {
+                var incident = await SaveNewIncident(ToCreateRequest(operation), user, store, logger, mutationId, cancellationToken);
+                results[index] = new SyncPushItemResult(mutationId, SyncResults.Ack, incident.Id, null);
+            }
+            catch (ApiException ex) when (ex.Code == "DUPLICATE_MUTATION")
+            {
+                var existing = await store.FindByMutationAsync(user.Id, mutationId, cancellationToken);
+                if (existing is null)
+                {
+                    throw;
+                }
+
+                results[index] = new SyncPushItemResult(mutationId, SyncResults.Ack, existing.Id, "DUPLICATE_MUTATION");
+                logger.LogInformation(
+                    "Sync item already stored for mutation {MutationId}. Incident {IncidentId}",
+                    mutationId,
+                    existing.Id);
+            }
         }
 
         var ackCount = results.Count(item => item.Result == SyncResults.Ack);

@@ -33,12 +33,12 @@ class SyncAttemptTest {
     fun marksAnAckAndAConflict() {
         val pending = row()
         val acked = SyncAttempt.apply(pending, "ack", null)
-        val conflict = SyncAttempt.apply(pending, "conflict", "DUPLICATE_MUTATION")
+        val duplicate = SyncAttempt.apply(pending, "conflict", "DUPLICATE_MUTATION")
 
         assertEquals(SyncStatus.ACK, acked.status)
         assertEquals(null, acked.lastError)
-        assertEquals(SyncStatus.CONFLICT, conflict.status)
-        assertEquals("DUPLICATE_MUTATION", conflict.lastError)
+        assertEquals(SyncStatus.ACK, duplicate.status)
+        assertEquals(null, duplicate.lastError)
     }
 
     private fun row(
