@@ -2,6 +2,7 @@ package za.co.munipulse.ui.onboarding
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -33,12 +35,12 @@ import kotlinx.coroutines.launch
 import za.co.munipulse.R
 import za.co.munipulse.ui.theme.PulseTeal
 
-private data class OnboardingPage(val titleRes: Int, val bodyRes: Int)
+private data class OnboardingPage(val titleRes: Int, val bodyRes: Int, val imageRes: Int)
 
 private val pages = listOf(
-    OnboardingPage(R.string.onboarding_page1_title, R.string.onboarding_page1_body),
-    OnboardingPage(R.string.onboarding_page2_title, R.string.onboarding_page2_body),
-    OnboardingPage(R.string.onboarding_page3_title, R.string.onboarding_page3_body),
+    OnboardingPage(R.string.onboarding_page1_title, R.string.onboarding_page1_body, R.drawable.ic_onboarding_report),
+    OnboardingPage(R.string.onboarding_page2_title, R.string.onboarding_page2_body, R.drawable.ic_onboarding_ward),
+    OnboardingPage(R.string.onboarding_page3_title, R.string.onboarding_page3_body, R.drawable.ic_onboarding_sync),
 )
 
 @Composable
@@ -71,6 +73,12 @@ fun OnboardingScreen(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
             ) {
+                Image(
+                    painter = painterResource(pages[page].imageRes),
+                    contentDescription = stringResource(pages[page].titleRes),
+                    modifier = Modifier.size(160.dp),
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = stringResource(pages[page].titleRes),
                     style = MaterialTheme.typography.headlineMedium,

@@ -29,6 +29,7 @@
     <string name="list_unreachable">Akufinyelelwanga ku-MuniPulse</string>
     <string name="list_retry">Zama futhi</string>
     <string name="list_empty_body">Bika iphutha lokuqala emgwaqweni wakho.</string>
+    <string name="empty_illustration">Umdwebo wohlu olungenalutho</string>
     <string name="hotspots_open">Izindawo eziphuthumayo zewadi</string>
     <string name="hotspots_title">Izindawo eziphuthumayo ze-%1$s</string>
     <string name="hotspots_note">Imibiko evulekile engaphakathi kwama-250 m, esigabeni esifanayo, nasezinsukwini eziyi-14 ezedlule ihlanganyela iqoqo elilodwa.</string>
@@ -212,7 +213,7 @@
     <string name="settings_privacy_title">Ubumfihlo</string>
     <string name="settings_privacy_body">Igama lakho, i-imeyili, iwadi, indawo, nezithombe ulwazi lomuntu siqu ngaphansi kwe-POPIA. Lo mbukiso ulugcina kuphela ngenkathi usebenzisa i-MuniPulse SA kulomsebenzi wesikole. Indawo nezithombe zisetshenziselwa ukubika iphutha likamasipala, hhayi ukumaketha.</string>
     <string name="notifications_title">Izaziso</string>
-    <string name="notifications_local_note">Kulondolozwe kule divayisi. Izaziso ezisunduza azithunyelwa.</string>
+    <string name="notifications_local_note">Kulondolozwe kule divayisi. Izaziso zetikithi nendawo zithunyelwa kuphela uma lezo zinkontshwayo zivuliwe. Ukumaketha kuhlala kule foni.</string>
     <string name="notifications_ticket_status">Isimo sekhethi</string>
     <string name="notifications_area_emergencies">Izimo eziphuthumayo endaweni</string>
     <string name="notifications_marketing">Ukumaketha nezindaba</string>

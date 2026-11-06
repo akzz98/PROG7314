@@ -1,0 +1,1 @@
+Your name, email, ward, location, and photos are personal information under POPIA. This demo keeps them only while you use MuniPulse SA for the assignment. Location and photos are used to report a municipal fault, not for marketing.

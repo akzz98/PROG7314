@@ -1,5 +1,6 @@
 package za.co.munipulse.ui.common
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,7 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import za.co.munipulse.R
 
@@ -36,7 +39,16 @@ fun ListEmpty(
     onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    Text(text = title, style = MaterialTheme.typography.titleMedium, modifier = modifier)
+    Image(
+        painter = painterResource(R.drawable.ic_empty_state),
+        contentDescription = stringResource(R.string.empty_illustration),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(72.dp),
+        contentScale = ContentScale.Fit,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(text = title, style = MaterialTheme.typography.titleMedium)
     if (body.isNotBlank()) {
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = body, style = MaterialTheme.typography.bodyLarge)

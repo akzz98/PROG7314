@@ -132,7 +132,18 @@ The app reads `API_BASE_URL` from `android/local.properties` (gitignored). Start
 | Emulator | `http://10.0.2.2:5285/` (the default) |
 | Physical phone | Your PC's LAN address, or an HTTPS tunnel |
 
-Debug builds allow cleartext HTTP. A release build needs an `https://` URL.
+Debug builds allow cleartext HTTP. A release build sets `usesCleartextTraffic` to false and refuses to assemble unless `API_BASE_URL` starts with `https://`.
+
+The release version is `versionName` `1.0.0` (`versionCode` 2). Minify stays off because Gson and Retrofit use model field names. Signing reads a gitignored keystore from `android/local.properties`:
+
+```
+RELEASE_STORE_FILE=release.keystore
+RELEASE_STORE_PASSWORD=<local password>
+RELEASE_KEY_ALIAS=munipulse
+RELEASE_KEY_PASSWORD=<local password>
+```
+
+`android/release.keystore` is covered by `*.keystore` in `.gitignore`. Create it on this machine only. The Play listing text is in `play-listing/`. Phone screenshots are listed in `play-listing/screenshots/README.md` and are added after a device run.
 
 ### Field-worker demo path
 

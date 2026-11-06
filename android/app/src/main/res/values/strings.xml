@@ -29,6 +29,7 @@
     <string name="list_unreachable">Could not reach MuniPulse</string>
     <string name="list_retry">Retry</string>
     <string name="list_empty_body">Report the first fault in your street.</string>
+    <string name="empty_illustration">Empty list illustration</string>
     <string name="hotspots_open">Ward hotspots</string>
     <string name="hotspots_title">%1$s hotspots</string>
     <string name="hotspots_note">Open reports within 250 m, the same category, and the last 14 days share one group.</string>
@@ -212,7 +213,7 @@
     <string name="settings_privacy_title">Privacy</string>
     <string name="settings_privacy_body">Your name, email, ward, location, and photos are personal information under POPIA. This demo keeps them only while you use MuniPulse SA for the assignment. Location and photos are used to report a municipal fault, not for marketing.</string>
     <string name="notifications_title">Notifications</string>
-    <string name="notifications_local_note">Saved on this device. Push alerts are not sent.</string>
+    <string name="notifications_local_note">Saved on this device. Ticket and area alerts are sent only when those switches are on. Marketing stays on this phone.</string>
     <string name="notifications_ticket_status">Ticket status</string>
     <string name="notifications_area_emergencies">Area emergencies</string>
     <string name="notifications_marketing">Marketing and news</string>

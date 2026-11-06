@@ -1,0 +1,9 @@
+MuniPulse SA helps a resident report a municipal fault in their ward. A report can include a photo and a GPS point. The ward list shows open incidents, and nearby reports of the same kind can be grouped.
+
+You can upvote a report, read the milestone timeline, and switch the app between English and isiZulu. Ticket updates and ward emergency alerts arrive only when those notification switches are on. Marketing stays on the phone.
+
+The map shows seeded water and evacuation points for the demo wards. It is not for 112 or live dispatch. The last points stay on the phone for Navigate cached when the network is off. A report made offline waits in the sync centre until the phone is online again.
+
+Profile shows a score and badges calculated by the server from your reports and the upvotes they received. The app can ask for a fingerprint or face unlock on a cold start when you turn that switch on.
+
+This build is a student demonstration for PROG7314 / OPSC7312. It is not a municipal service.

@@ -4,11 +4,17 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Pulse ring. The safe zone is the centre 66dp. No wordmark. -->
     <path
         android:fillColor="#0B6E4F"
         android:fillType="evenOdd"
-        android:pathData="M54,22a32,32 0 1,0 0.1,0z M54,32a22,22 0 1,1 -0.1,0z" />
+        android:pathData="M54,24a30,30 0 1,0 0.1,0z M54,32a22,22 0 1,1 -0.1,0z" />
+    <!-- Municipal shield -->
     <path
         android:fillColor="#0B6E4F"
-        android:pathData="M54,48a6,6 0 1,0 0.1,0z" />
+        android:pathData="M54,38 L70,44 L70,56 C70,66 54,74 54,74 C54,74 38,66 38,56 L38,44 Z" />
+    <!-- Centre pin, sand so it reads on the shield -->
+    <path
+        android:fillColor="#E8DCC8"
+        android:pathData="M54,48c-3.2,0 -5.8,2.5 -5.8,5.6c0,4.2 5.8,10.4 5.8,10.4s5.8,-6.2 5.8,-10.4c0,-3.1 -2.6,-5.6 -5.8,-5.6z" />
 </vector>

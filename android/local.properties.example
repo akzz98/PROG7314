@@ -5,3 +5,10 @@
 # your machine's LAN address or an HTTPS tunnel, for example:
 # API_BASE_URL=https://your-host.example/
 API_BASE_URL=http://10.0.2.2:5285/
+#
+# Release signing. The keystore file is gitignored. A release build refuses a URL that
+# does not start with https://.
+# RELEASE_STORE_FILE=release.keystore
+# RELEASE_STORE_PASSWORD=
+# RELEASE_KEY_ALIAS=munipulse
+# RELEASE_KEY_PASSWORD=

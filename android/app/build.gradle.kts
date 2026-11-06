@@ -11,16 +11,26 @@ android {
     namespace = "za.co.munipulse"
     compileSdk = 37
 
+    val local = readLocalProperties()
+    signingConfigs {
+        create("release") {
+            val store = local.getProperty("RELEASE_STORE_FILE")?.trim().orEmpty()
+            if (store.isNotEmpty()) {
+                storeFile = rootProject.file(store)
+                storePassword = local.getProperty("RELEASE_STORE_PASSWORD")
+                keyAlias = local.getProperty("RELEASE_KEY_ALIAS")
+                keyPassword = local.getProperty("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     defaultConfig {
         // Must match the Android package registered in google-services.json.
         applicationId = "com.munipulse"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
-
-        val apiBaseUrl = readApiBaseUrl()
-        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        versionCode = 2
+        versionName = "1.0.0"
     }
 
     buildFeatures {
@@ -34,8 +44,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "API_BASE_URL", "\"${apiBaseUrl(local, release = false)}\"")
+        }
         release {
+            // Minify stays off. Gson and Retrofit use model field names, and there is no keep file yet.
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+            buildConfigField("String", "API_BASE_URL", "\"${apiBaseUrl(local, release = true)}\"")
         }
     }
 }
@@ -75,15 +91,35 @@ dependencies {
     testImplementation(libs.junit)
 }
 
-// API host is local configuration, not a committed secret. Android Studio writes sdk.dir
-// into the same local.properties file.
-private fun readApiBaseUrl(): String {
+// API host and the release keystore are local configuration, not committed secrets.
+private fun readLocalProperties(): Properties {
     val properties = Properties()
     val file = rootProject.file("local.properties")
     if (file.exists()) {
         file.inputStream().use { properties.load(it) }
     }
+    return properties
+}
+
+private fun apiBaseUrl(properties: Properties, release: Boolean): String {
     val configured = properties.getProperty("API_BASE_URL")?.trim().orEmpty()
+    if (release) {
+        val https = if (configured.startsWith("https://")) configured else "https://replace-me.invalid/"
+        return https.trimEnd('/') + "/"
+    }
     val base = if (configured.isEmpty()) "http://10.0.2.2:5285/" else configured
     return base.trimEnd('/') + "/"
+}
+
+tasks.configureEach {
+    if (name == "preReleaseBuild") {
+        doFirst {
+            val configured = readLocalProperties().getProperty("API_BASE_URL")?.trim().orEmpty()
+            if (!configured.startsWith("https://")) {
+                throw GradleException(
+                    "Release builds need API_BASE_URL to start with https:// in android/local.properties.",
+                )
+            }
+        }
+    }
 }
