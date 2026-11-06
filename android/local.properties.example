@@ -1,9 +1,11 @@
 # Copy to local.properties (gitignored). Android Studio also writes sdk.dir here.
 # sdk.dir=C:\\Users\\YourName\\AppData\\Local\\Android\\Sdk
 #
-# Emulator default reaches the API http profile on the host. A physical phone needs
-# your machine's LAN address or an HTTPS tunnel, for example:
-# API_BASE_URL=https://your-host.example/
+# The app a lecturer installs is dist/MuniPulse-SA-1.0.0.apk. That file already
+# calls the public API. Use the address below only for a debug build on this PC
+# that talks to a local API. A release build refuses a URL that does not start
+# with https://. The public host is:
+# API_BASE_URL=https://munipulse-st10263456.azurewebsites.net/
 API_BASE_URL=http://10.0.2.2:5285/
 #
 # Release signing. The keystore file is gitignored. A release build refuses a URL that

@@ -9,6 +9,7 @@ checklist.md
 **/local.properties
 **/google-services.json
 *.apk
+!dist/MuniPulse-SA-1.0.0.apk
 *.aab
 *.ap_
 *.dex

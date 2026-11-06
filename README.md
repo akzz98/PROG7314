@@ -2,6 +2,24 @@
 
 Citizen Service Delivery and Community Incident Tracker for South African wards. This repository is the Final POE for PROG7314 / OPSC7312, student Alton Muganda (St10263456), solo. The app version is `1.0.0` (`versionCode` 2).
 
+## Install on a phone
+
+Mark the app from the signed file in this repository:
+
+`dist/MuniPulse-SA-1.0.0.apk`
+
+That file is already signed with the release certificate registered on Firebase project `munipulse-987ce`, and it already calls the public API at [https://munipulse-st10263456.azurewebsites.net/](https://munipulse-st10263456.azurewebsites.net/). A browser check of [https://munipulse-st10263456.azurewebsites.net/health](https://munipulse-st10263456.azurewebsites.net/health) returns `{"status":"ok","app":"MuniPulse SA"}`. You do not run the API, create a database, or register a SHA-1.
+
+1. Use an Android phone running Android 8 or newer, with Google Play and a Google account on the phone.
+2. Copy `dist/MuniPulse-SA-1.0.0.apk` onto the phone.
+3. Open the file and install it. If the phone asks, allow installation from that source. If Play Protect asks, choose to install anyway.
+4. If Android refuses the install because MuniPulse SA is already on the phone, uninstall that copy first. A debug build is signed with a different certificate, so it cannot update over this release file.
+5. Open **MuniPulse SA**. On a first install, swipe through the three intro pages, then tap **Continue with Google** and pick the Google account on that phone. Home opens next.
+
+After sign-in you can change the ward and language in Settings, send a report with a photo and location, turn on biometric unlock if the phone has a fingerprint or face enrolled, open the ward map, and queue a report in airplane mode. Sync centre sends a queued report once the phone is online again. The first map load needs a network connection. After that, **Navigate cached** opens the saved water point and evacuation site for the ward. Allow notifications for MuniPulse SA in the phone settings if you want a ticket or ward alert. On Android 13 and newer the system asks for that permission outside the app.
+
+A build made on another computer is signed with that computer's own debug certificate. Google sign-in stops on that build, because that certificate is not the one registered for this project. Use the APK above.
+
 ## Purpose
 
 A resident signs in with Google, reports a municipal fault with a photo and a GPS fix, and follows that report from the ward list. People upvote the same problem so it ranks as one ward signal. A field worker appends milestones. The phone can work offline, show water and evacuation points for the ward, and show an impact score that the server calculates.
@@ -16,7 +34,7 @@ A resident signs in with Google, reports a municipal fault with a photo and a GP
 | Unlock | Optional `BiometricPrompt` on a cold start, with Google sign-in as the fallback |
 | Push | Firebase Cloud Messaging. The API sends ticket and ward alerts with FCM HTTP v1 |
 | API | ASP.NET Core Web API on .NET 10 |
-| Database | MongoDB Atlas. Collections: `users`, `incidents`, `wards`, `media`, `device_tokens`, `emergency_points` |
+| Database | MongoDB. The deployed API uses Azure Cosmos DB for MongoDB, database `munipulse`. Collections: `users`, `incidents`, `wards`, `media`, `device_tokens`, `emergency_points` |
 | Photos | JPEG upload through a 15-minute Azure Blob link |
 
 ## Architecture
@@ -59,12 +77,13 @@ Biometric unlock is local. It does not replace the API JWT. Marketing notificati
 ```
 android/          Jetpack Compose app (application id com.munipulse)
 api/              MuniPulse.slnx and MuniPulse.Api
+dist/             MuniPulse-SA-1.0.0.apk, the signed app to install on a phone
 play-listing/     Play Store text and the screenshot folder
 ```
 
 ## GitHub Actions
 
-This is one Git repository. Commit source, the Gradle wrapper, `google-services.json.example`, and `appsettings.json` with the secret fields left empty. The root `.gitignore` keeps local files out of history: `google-services.json`, `local.properties`, `*.keystore`, `appsettings.Development.json`, `App_Data/`, build output, APK and AAB files, and `CHECKLIST.md`. There is no zip of the source tree. `android/gradle/wrapper/gradle-wrapper.jar` is the Gradle wrapper, not a source dump.
+This is one Git repository. Commit source, the Gradle wrapper, `google-services.json.example`, and `appsettings.json` with the secret fields left empty. The root `.gitignore` keeps local files out of history: `google-services.json`, `local.properties`, `*.keystore`, `appsettings.Development.json`, `App_Data/`, build output, AAB files, APK files other than `dist/MuniPulse-SA-1.0.0.apk`, and `CHECKLIST.md`. There is no zip of the source tree. `android/gradle/wrapper/gradle-wrapper.jar` is the Gradle wrapper, not a source dump.
 
 Every push runs two workflows. Each job checks out the repository with read-only permission and defines no secrets. Neither workflow filters the test task, so the F3 SAS tests, the F4 sync tests, and the F7 impact tests run with the rest of the suite.
 
@@ -77,11 +96,13 @@ The API job uses the empty MongoDB connection string and the empty JWT signing k
 
 ## Setup
 
-Keep the Atlas connection string, the Azure Storage connection string, the JWT signing key, the Firebase service account, the field-worker demo key, and `google-services.json` on your machine. The commands below use [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) for the API. You can use a gitignored `appsettings.Development.json` instead, copied from `api/MuniPulse.Api/appsettings.Development.json.example`.
+The phone app in `dist/` already uses the deployed API. The rest of this Setup section is only for running the API on a development machine. A lecturer marking the phone app can skip it.
+
+Keep the MongoDB connection string, the Azure Storage connection string, the JWT signing key, the Firebase service account, the field-worker demo key, and `google-services.json` on your machine. The commands below use [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) for the API. You can use a gitignored `appsettings.Development.json` instead, copied from `api/MuniPulse.Api/appsettings.Development.json.example`.
 
 ### MongoDB
 
-Create a MongoDB Atlas cluster and a database user. The API database name is `munipulse`.
+For a local API, set a MongoDB connection string and a database user. The database name is `munipulse`. The deployed API already has this database.
 
 ```powershell
 dotnet user-secrets set "MongoDb:ConnectionString" "<atlas-connection-string>" --project api/MuniPulse.Api
@@ -119,17 +140,19 @@ Enable Cloud Messaging in the Firebase console for `munipulse-987ce`. Field work
 
 ### Firebase
 
-The Android package is `com.munipulse`. `android/app/google-services.json` is gitignored. Commit `android/app/google-services.json.example` only.
+The Android package is `com.munipulse`. The Firebase project is `munipulse-987ce`. Google sign-in is already enabled, and the Web client is already in the marking APK.
 
-1. Copy `android/app/google-services.json.example` to `android/app/google-services.json` if the downloaded file is not there yet.
-2. From `android/`, run `.\gradlew.bat :app:signingReport` and register the debug SHA-1 on the Firebase Android app.
-3. Enable the Google sign-in provider. That creates a Web client ID.
-4. Download `google-services.json` again into `android/app/`. The file is ready for sign-in when a Web client appears under `oauth_client`.
-5. Rebuild and run on a device or emulator with Google Play. Tap **Continue with Google**.
+`android/app/google-services.json` is gitignored. Commit `android/app/google-services.json.example` only. The real file is compiled into `dist/MuniPulse-SA-1.0.0.apk`. The release certificate from `android/release.keystore`, and the debug certificate from this development machine, are both registered on that Firebase Android app.
+
+A rebuild on another computer produces a different debug certificate. Google sign-in fails for that APK until its SHA-1 is added in the Firebase console. Install `dist/MuniPulse-SA-1.0.0.apk` instead of rebuilding.
+
+On this development machine, a local rebuild still needs `android/app/google-services.json`, with a Web client under `oauth_client`.
 
 ### API URL
 
-The API http profile listens on `http://localhost:5285`. Health check: [http://localhost:5285/health](http://localhost:5285/health).
+`dist/MuniPulse-SA-1.0.0.apk` calls [https://munipulse-st10263456.azurewebsites.net/](https://munipulse-st10263456.azurewebsites.net/). Keep that host for any build you hand to a lecturer.
+
+The API http profile on a development machine listens on `http://localhost:5285`. Health check: [http://localhost:5285/health](http://localhost:5285/health).
 
 The app reads `API_BASE_URL` from `android/local.properties` (gitignored). Start from `android/local.properties.example`.
 
@@ -165,6 +188,8 @@ A Development host can also accept session aliases `dev-citizen` and `dev-field-
 
 ## How to run
 
+Marking the app on a phone uses `dist/MuniPulse-SA-1.0.0.apk`. The commands below are for tests and for a local API on a development machine.
+
 ### API
 
 Requires the .NET 10 SDK.
@@ -184,7 +209,7 @@ Health check: [http://localhost:5285/health](http://localhost:5285/health)
 
 ### Android
 
-Open `android/` in Android Studio (AGP 9.4, Gradle 9.6, compile SDK 37). Studio writes `sdk.dir` into `android/local.properties`. Set `API_BASE_URL` as described above.
+Open `android/` in Android Studio (AGP 9.4, Gradle 9.6, compile SDK 37) only when you are changing the app on this development machine. Studio writes `sdk.dir` into `android/local.properties`. A marking build keeps `API_BASE_URL` on the public HTTPS host above. The emulator address in `android/local.properties.example` is for a local API on this PC.
 
 ```powershell
 cd android
@@ -250,7 +275,7 @@ Protected routes return `401 UNAUTHENTICATED` when the token is missing and `401
 
 ## Screenshots
 
-Take these on a physical phone and save the PNG files in `play-listing/screenshots/`. The folder is listed in the repository. The image files are added after that device run.
+The phone screenshots are in `play-listing/screenshots/`.
 
 | File | Screen |
 | --- | --- |
