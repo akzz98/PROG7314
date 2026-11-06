@@ -63,6 +63,7 @@ fun MuniPulseApp(
     val upvoteBusy by viewModel.upvoteBusy.collectAsState()
     val hotspots by viewModel.hotspots.collectAsState()
     val emergencyMap by viewModel.emergencyMap.collectAsState()
+    val impact by viewModel.impact.collectAsState()
     val nearby by viewModel.nearby.collectAsState()
     val biometricEnabled by viewModel.biometricEnabled.collectAsState()
     val biometricUnlocked by viewModel.biometricUnlocked.collectAsState()
@@ -169,6 +170,8 @@ fun MuniPulseApp(
             defaultWardCode = current.defaultWardCode,
             preferredLanguage = current.preferredLanguage,
             role = current.role,
+            impact = impact,
+            onRefreshImpact = viewModel::refreshImpact,
             onBack = { showProfile = false },
         )
         current is SignInUiState.SignedIn && showLanguage -> LanguageScreen(

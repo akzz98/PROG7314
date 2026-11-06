@@ -197,6 +197,15 @@
     <string name="profile_language_zu">isiZulu</string>
     <string name="profile_role">Indima</string>
     <string name="profile_impact">Isikolo somthelela nezimpawu</string>
+    <string name="profile_score">Isikolo</string>
+    <string name="profile_reports">Imibiko</string>
+    <string name="profile_upvotes">Amavoti atholakele</string>
+    <string name="profile_badges">Izimpawu</string>
+    <string name="profile_badges_none">Azikabi khona izimpawu</string>
+    <string name="profile_impact_failed">Isikolo somthelela asilandwanga.</string>
+    <string name="badge_first_report">Umbiko wokuqala</string>
+    <string name="badge_community_voice">Izwi lomphakathi</string>
+    <string name="badge_verified_reporter">Umbiki oqinisekisiwe</string>
     <string name="settings_privacy_title">Ubumfihlo</string>
     <string name="settings_privacy_body">Igama lakho, i-imeyili, iwadi, indawo, nezithombe ulwazi lomuntu siqu ngaphansi kwe-POPIA. Lo mbukiso ulugcina kuphela ngenkathi usebenzisa i-MuniPulse SA kulomsebenzi wesikole. Indawo nezithombe zisetshenziselwa ukubika iphutha likamasipala, hhayi ukumaketha.</string>
     <string name="notifications_title">Izaziso</string>

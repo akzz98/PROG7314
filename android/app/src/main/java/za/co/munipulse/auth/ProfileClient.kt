@@ -24,6 +24,14 @@ object ProfileClient {
 
     suspend fun get(accessToken: String): UserProfileDto = parse(api.me(bearer(accessToken)))
 
+    suspend fun impact(accessToken: String): ImpactDto {
+        val response = api.impact(bearer(accessToken))
+        if (!response.isSuccessful) {
+            throw ProfileSyncException("The impact score did not load (${response.code()}).")
+        }
+        return response.body() ?: throw ProfileSyncException("The impact score did not load.")
+    }
+
     suspend fun patch(accessToken: String, body: PatchMeBody): UserProfileDto =
         parse(api.patchMe(bearer(accessToken), body))
 
@@ -56,6 +64,9 @@ private interface ProfileApi {
     @GET("api/v1/me")
     suspend fun me(@Header("Authorization") authorization: String): Response<UserProfileDto>
 
+    @GET("api/v1/me/impact")
+    suspend fun impact(@Header("Authorization") authorization: String): Response<ImpactDto>
+
     @PATCH("api/v1/me")
     suspend fun patchMe(
         @Header("Authorization") authorization: String,
@@ -76,6 +87,13 @@ data class UserProfileDto(
     val preferredLanguage: String? = null,
     val roles: List<String>? = null,
     val notifications: ApiNotifications? = null,
+)
+
+data class ImpactDto(
+    val score: Int = 0,
+    val badges: List<String>? = emptyList(),
+    val reportsCount: Int = 0,
+    val upvoteCount: Int = 0,
 )
 
 data class PatchMeBody(

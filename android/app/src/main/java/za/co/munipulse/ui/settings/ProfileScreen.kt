@@ -19,6 +19,21 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import za.co.munipulse.R
 import za.co.munipulse.auth.WardCatalog
+import za.co.munipulse.ui.common.ListError
+import za.co.munipulse.ui.common.ListLoading
+
+sealed interface ImpactUi {
+    data object Idle : ImpactUi
+    data object Loading : ImpactUi
+    data class Ready(
+        val score: Int,
+        val badges: List<String>,
+        val reportsCount: Int,
+        val upvoteCount: Int,
+    ) : ImpactUi
+
+    data class Failed(val message: String) : ImpactUi
+}
 
 @Composable
 fun ProfileScreen(
@@ -27,6 +42,8 @@ fun ProfileScreen(
     defaultWardCode: String,
     preferredLanguage: String,
     role: String,
+    impact: ImpactUi,
+    onRefreshImpact: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -37,6 +54,7 @@ fun ProfileScreen(
 
     LaunchedEffect(Unit) {
         Log.i(TAG, "Opened profile")
+        onRefreshImpact()
     }
 
     BackHandler(onBack = onBack)
@@ -66,16 +84,38 @@ fun ProfileScreen(
         )
         ProfileField(label = stringResource(R.string.profile_language), value = languageLabel)
         ProfileField(label = stringResource(R.string.profile_role), value = roleName(role))
-        // FINAL POE: UD-5 impact score and badges are not part of the Part 2 profile.
         Text(
             text = stringResource(R.string.profile_impact),
             style = MaterialTheme.typography.titleMedium,
         )
-        Text(
-            text = stringResource(R.string.settings_final_poe),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        when (impact) {
+            ImpactUi.Idle, ImpactUi.Loading -> ListLoading()
+            is ImpactUi.Failed -> ListError(message = impact.message, onRetry = onRefreshImpact)
+            is ImpactUi.Ready -> {
+                ProfileField(label = stringResource(R.string.profile_score), value = impact.score.toString())
+                ProfileField(label = stringResource(R.string.profile_reports), value = impact.reportsCount.toString())
+                ProfileField(label = stringResource(R.string.profile_upvotes), value = impact.upvoteCount.toString())
+                ProfileField(label = stringResource(R.string.profile_badges), value = badgeLine(impact.badges))
+            }
+        }
+    }
+}
+
+@Composable
+private fun badgeLine(badges: List<String>): String {
+    if (badges.isEmpty()) {
+        return stringResource(R.string.profile_badges_none)
+    }
+    val firstReport = stringResource(R.string.badge_first_report)
+    val communityVoice = stringResource(R.string.badge_community_voice)
+    val verifiedReporter = stringResource(R.string.badge_verified_reporter)
+    return badges.joinToString(separator = ", ") { code ->
+        when (code) {
+            "FirstReport" -> firstReport
+            "CommunityVoice" -> communityVoice
+            "VerifiedReporter" -> verifiedReporter
+            else -> code
+        }
     }
 }
 

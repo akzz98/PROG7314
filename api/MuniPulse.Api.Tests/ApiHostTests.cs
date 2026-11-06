@@ -66,6 +66,16 @@ public class ApiHostTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task ImpactWithoutATokenIsUnauthorized()
+    {
+        var read = await _client.GetAsync("/api/v1/me/impact");
+        var write = await _client.PostAsJsonAsync("/api/v1/me/badges", new { badge = "VerifiedReporter" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, read.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, write.StatusCode);
+    }
+
+    [Fact]
     public async Task EmergencyPointsWithoutATokenAreUnauthorized()
     {
         var response = await _client.GetAsync("/api/v1/emergency/points?wardCode=JHB-23");

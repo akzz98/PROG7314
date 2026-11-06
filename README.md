@@ -47,7 +47,7 @@ flowchart TB
 
 Part 2 includes Google SSO, Settings, the custom API and database, and custom features UD-1 (photo + GPS), UD-2 (upvotes and ward aggregation), and UD-3 (resolution timeline).
 
-Final POE still to come: impact scores (UD-5). English, isiZulu, biometric unlock, Azure Blob photos, the Room queue, FCM ticket and ward alerts, and the emergency map (UD-4) are in this build. The map draws seeded water and evacuation points on the phone. It does not use a map-provider key. With no network, **Navigate cached** opens the last points saved for that ward. A valid report with no network is stored on the phone and the form says it is queued.
+English, isiZulu, biometric unlock, Azure Blob photos, the Room queue, FCM ticket and ward alerts, the emergency map (UD-4), and impact scores (UD-5) are in this build. The map draws seeded water and evacuation points on the phone. It does not use a map-provider key. With no network, **Navigate cached** opens the last points saved for that ward. A valid report with no network is stored on the phone and the form says it is queued.
 
 ## Layout
 
@@ -154,7 +154,7 @@ Requires the .NET 10 SDK.
 dotnet run --project api/MuniPulse.Api --launch-profile http
 ```
 
-`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, SAS request validation, the sync push contract, the 250 metre duplicate window, push preference and copy rules, the emergency-point seed for each demo ward, the field-worker demo key comparison, and unauthenticated calls (including area alerts and emergency points). They do not need Firebase, MongoDB, Azure, a map key, or a JWT signing key. The API workflow runs the same command on every push.
+`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, SAS request validation, the sync push contract, the 250 metre duplicate window, push preference and copy rules, the emergency-point seed for each demo ward, impact score rules, a citizen token that cannot write a badge, the field-worker demo key comparison, and unauthenticated calls (including area alerts and emergency points). They do not need Firebase, MongoDB, Azure, a map key, or a JWT signing key. The API workflow runs the same command on every push.
 
 Health check: [http://localhost:5285/health](http://localhost:5285/health)
 
@@ -171,7 +171,9 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 | Method | Path | Auth |
 | --- | --- | --- |
 | POST | `/api/v1/auth/session` | Firebase ID token in the body. The API checks it against Google's securetoken certificates, then returns an API JWT. |
-| GET, PATCH | `/api/v1/me` | Bearer API JWT |
+| GET, PATCH | `/api/v1/me` | Bearer API JWT. PATCH accepts ward, language, and notification switches. `impactScore`, `score`, and `badges` are refused with `403 BADGE_FORBIDDEN`. |
+| GET | `/api/v1/me/impact` | Bearer API JWT. Returns `score`, `badges`, `reportsCount`, and `upvoteCount` calculated on the server. A user with no reports gets zeros. |
+| POST | `/api/v1/me/badges` | Bearer API JWT. Always `403 BADGE_FORBIDDEN`. A citizen cannot award `VerifiedReporter`. |
 | POST | `/api/v1/media/sas` | Bearer API JWT. Body is `contentType` (`image/jpeg`) and `byteSize` (1 to 5 MB). Returns `photoId`, `uploadUrl`, and `expiresAt`. The link lasts 15 minutes. The app uploads the JPEG to that URL. |
 | POST | `/api/v1/sync/push` | Bearer API JWT. A batch of 1 to 20 queued `createIncident` operations. Each result is `ack` or `conflict`. Photos are uploaded with the media link first. |
 | POST, DELETE | `/api/v1/devices/fcm-token` | Bearer API JWT. POST body is `token` and `platform` (`android`). Stores the device push token. DELETE removes that user's tokens. Sign-out calls DELETE. |
@@ -186,6 +188,20 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 | POST | `/api/v1/alerts/area` | FieldWorker role, or header `X-Demo-Api-Key`. Body `{ "wardCode", "note" }`. Pushes an area alert to users with that default ward and area emergencies on. |
 
 Demo wards seeded into MongoDB: `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, `TSH-04`. Categories: `Pothole`, `WaterLeak`, `IllegalDumping`, `Streetlight`, `Sewage`, `Other`.
+
+### Impact score (UD-5)
+
+`GET /api/v1/me/impact` counts the signed-in user's stored reports and the upvotes already on those reports. The client does not send a score.
+
+| Rule | Value |
+| --- | --- |
+| Each report | 10 points |
+| Each upvote received | 2 points |
+| `FirstReport` | At least one report |
+| `CommunityVoice` | At least 5 upvotes received |
+| `VerifiedReporter` | Staff role (`FieldWorker` or `WardLead`) and at least one report |
+
+A citizen account never receives `VerifiedReporter` from this calculation. `POST /api/v1/me/badges` and a profile patch that includes a score or badges return `403 BADGE_FORBIDDEN`. The result is saved on the user document after it is calculated.
 
 A Development host with `Auth:AllowDevBypass` set to true accepts `firebaseIdToken` values `dev-citizen` and `dev-field-worker` and returns an API JWT. Those aliases are refused in any other environment. See [Setup](#setup).
 
@@ -223,7 +239,7 @@ Language opens from Settings and switches the app between English and isiZulu. B
 
 Settings includes a POPIA-style privacy note: name, email, ward, location, and photos are kept only for this demo, and location and photos are used to report a fault.
 
-Settings opens Profile. That screen shows the name, masked email, default ward, language, and role. Impact score and badges are marked **Coming in Final POE** and are not shown.
+Settings opens Profile. That screen shows the name, masked email, default ward, language, role, and the server impact score: points, badges, report count, and upvotes received. A user with no reports sees zero.
 
 Home opens **New incident**. The form has a category (pothole, water leak, illegal dumping, streetlight, sewage, or other), a description, up to three photo previews from the camera or gallery, and a GPS line with **Refresh GPS**. Denying camera, gallery, or location stays on the screen and does not close the app. **Submit report** checks the category, a description of 10 to 1000 characters, a latitude and longitude, accuracy when a fix has one, the default ward, and a maximum of three photos. Invalid input stays on the screen. When a location is set, the form asks `GET /api/v1/incidents/nearby` and can expand **Nearby duplicates** with the category, a short place line, the upvote count, and the distance. A valid form asks for an upload link, puts each JPEG in Azure Blob, then `POST /api/v1/incidents` with a stable `clientMutationId`. If the phone has no network, the same form stores the draft and the photo files on the device and says the report is queued. It does not close. If a photo upload fails, the form stays open and the incident is not created. A retry of that same form returns the already-submitted message instead of a second row. Logcat records permission results, the photo id, the upload status, create success or failure, and the accuracy in metres. It does not record the coordinates, the description, a token, or the upload link.
 

@@ -1,5 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using MuniPulse.Api.Auth;
@@ -17,6 +19,8 @@ public static class ApiEndpoints
         var api = app.MapGroup("/api/v1");
         api.MapPost("/auth/session", CreateSession);
         api.MapGet("/me", GetMe).RequireAuthorization();
+        api.MapGet("/me/impact", GetImpact).RequireAuthorization();
+        api.MapPost("/me/badges", RejectBadgeWrite).RequireAuthorization();
         api.MapPatch("/me", PatchMe).RequireAuthorization();
         api.MapPost("/incidents", CreateIncident).RequireAuthorization().RequireRateLimiting("writes");
         api.MapPost("/media/sas", IssueMediaSas).RequireAuthorization().RequireRateLimiting("writes");
@@ -96,6 +100,11 @@ public static class ApiEndpoints
         ILogger<IncidentStore> logger,
         CancellationToken cancellationToken)
     {
+        if (request is not null && ImpactRules.IsClientScoreOrBadge(request.Extra?.Keys))
+        {
+            return BadgeForbidden(http);
+        }
+
         var user = await RequireUserAsync(http, store, cancellationToken);
         if (user is null)
         {
@@ -152,6 +161,39 @@ public static class ApiEndpoints
         logger.LogInformation("Profile updated for user {UserId}", user.Id);
         return Results.Ok(ToUser(user));
     }
+
+    private static async Task<IResult> GetImpact(
+        HttpContext http,
+        IncidentStore store,
+        ILogger<IncidentStore> logger,
+        CancellationToken cancellationToken)
+    {
+        var user = await RequireUserAsync(http, store, cancellationToken);
+        if (user is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Sign in is required.");
+        }
+
+        var summary = await store.SummarizeReporterAsync(user.Id, cancellationToken);
+        var impact = ImpactRules.Calculate(summary.ReportsCount, summary.UpvoteCount, user.Roles);
+        user.ImpactScore = impact.Score;
+        user.Badges = impact.Badges.ToList();
+        await store.ReplaceUserAsync(user, cancellationToken);
+        logger.LogInformation(
+            "Impact calculated for user {UserId}. Reports {ReportsCount}",
+            user.Id,
+            impact.ReportsCount);
+        return Results.Ok(new ImpactResponse(impact.Score, impact.Badges.ToArray(), impact.ReportsCount, impact.UpvoteCount));
+    }
+
+    private static IResult RejectBadgeWrite(HttpContext http) => BadgeForbidden(http);
+
+    private static IResult BadgeForbidden(HttpContext http) =>
+        ApiErrors.Result(
+            http,
+            StatusCodes.Status403Forbidden,
+            "BADGE_FORBIDDEN",
+            "Badges and the impact score are assigned by the server. A citizen cannot award VerifiedReporter.");
 
     private static async Task<IResult> CreateIncident(
         CreateIncidentRequest? request,
@@ -1372,7 +1414,12 @@ public sealed class PatchMeRequest
     public string? PreferredLanguage { get; set; }
 
     public NotificationPatch? Notifications { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
+
+public sealed record ImpactResponse(int Score, string[] Badges, int ReportsCount, int UpvoteCount);
 
 public sealed class NotificationPatch
 {

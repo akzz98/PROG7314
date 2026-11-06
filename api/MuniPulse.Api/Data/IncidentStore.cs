@@ -212,6 +212,22 @@ public sealed class IncidentStore
         }
     }
 
+    public async Task<ReporterImpact> SummarizeReporterAsync(string reporterId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var upvoteCounts = await Incidents()
+                .Find(incident => incident.ReporterId == reporterId)
+                .Project(incident => incident.UpvoteCount)
+                .ToListAsync(cancellationToken);
+            return new ReporterImpact(upvoteCounts.Count, upvoteCounts.Sum());
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
+    }
+
     public async Task<IncidentReport?> FindByMutationAsync(
         string reporterId,
         string clientMutationId,
@@ -675,6 +691,8 @@ public sealed class IncidentStore
             "MuniPulse could not reach the database.");
     }
 }
+
+public sealed record ReporterImpact(int ReportsCount, int UpvoteCount);
 
 public sealed record IncidentPage(IReadOnlyList<IncidentReport> Items, string? NextCursor);
 

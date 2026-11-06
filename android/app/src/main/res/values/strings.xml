@@ -197,6 +197,15 @@
     <string name="profile_language_zu">isiZulu</string>
     <string name="profile_role">Role</string>
     <string name="profile_impact">Impact score and badges</string>
+    <string name="profile_score">Score</string>
+    <string name="profile_reports">Reports</string>
+    <string name="profile_upvotes">Upvotes received</string>
+    <string name="profile_badges">Badges</string>
+    <string name="profile_badges_none">No badges yet</string>
+    <string name="profile_impact_failed">The impact score did not load.</string>
+    <string name="badge_first_report">First report</string>
+    <string name="badge_community_voice">Community voice</string>
+    <string name="badge_verified_reporter">Verified reporter</string>
     <string name="settings_privacy_title">Privacy</string>
     <string name="settings_privacy_body">Your name, email, ward, location, and photos are personal information under POPIA. This demo keeps them only while you use MuniPulse SA for the assignment. Location and photos are used to report a municipal fault, not for marketing.</string>
     <string name="notifications_title">Notifications</string>

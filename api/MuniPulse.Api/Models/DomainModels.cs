@@ -3,8 +3,8 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace MuniPulse.Api.Models;
 
-// Planning section H. Impact score and badges are stored so the document shape
-// survives until Final POE UD-5. Part 2 responses do not expose them.
+// Planning section H. ImpactScore and Badges are stored after the server calculates them.
+// Profile reads use GET /api/v1/me/impact. Clients cannot send either field.
 public sealed class UserProfile
 {
     [BsonId]
