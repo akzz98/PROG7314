@@ -851,9 +851,14 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                     return@launch
                 }
                 if (!DeviceNetwork.isOnline(getApplication())) {
-                    database.pendingSync().upsert(SyncAttempt.retry(row, online = false))
-                    Log.i(TAG, "Queued retry ${row.id}. Count ${row.retryCount + 1}")
-                    publishSyncCentre(note = syncNote(online = false), busy = false)
+                    val updated = SyncAttempt.retry(row, online = false)
+                    database.pendingSync().upsert(updated)
+                    Log.i(TAG, "Queued retry. Count ${updated.retryCount}")
+                    publishSyncCentre(
+                        note = syncNote(online = false),
+                        busy = false,
+                        written = listOf(updated),
+                    )
                     return@launch
                 }
                 pushRows(listOf(row))
@@ -872,11 +877,10 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 val database = MuniPulseDatabase.get(getApplication())
                 val pending = database.pendingSync().list().filter { it.status == SyncStatus.PENDING }
                 if (!online) {
-                    pending.forEach { row ->
-                        database.pendingSync().upsert(SyncAttempt.retry(row, online = false))
-                    }
-                    Log.i(TAG, "Sync now recorded ${pending.size} queued reports. Online false")
-                    publishSyncCentre(note = syncNote(online = false), busy = false)
+                    val updated = pending.map { SyncAttempt.retry(it, online = false) }
+                    updated.forEach { database.pendingSync().upsert(it) }
+                    Log.i(TAG, "Sync now recorded ${updated.size} queued reports. Online false")
+                    publishSyncCentre(note = syncNote(online = false), busy = false, written = updated)
                     return@launch
                 }
                 if (pending.isEmpty()) {
@@ -900,6 +904,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         }
         val database = MuniPulseDatabase.get(getApplication())
         val ready = ArrayList<Pair<PendingSyncOperation, List<String>>>()
+        val failed = ArrayList<PendingSyncOperation>()
         for (row in rows) {
             if (row.status != SyncStatus.PENDING) {
                 continue
@@ -910,13 +915,28 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 val photoIds = if (files.isEmpty()) emptyList() else IncidentClient.uploadPhotos(token, files)
                 ready += row to photoIds
             } catch (error: Exception) {
-                val code = if (error is IncidentRequestException) error.code else "UPLOAD_FAILED"
-                database.pendingSync().upsert(row.copy(retryCount = row.retryCount + 1, lastError = code))
-                Log.e(TAG, "Queued photo upload failed: $code")
+                val updated = if (TransportFailure.isOffline(error)) {
+                    SyncAttempt.retry(row, online = false)
+                } else {
+                    val code = if (error is IncidentRequestException) error.code else "UPLOAD_FAILED"
+                    row.copy(retryCount = row.retryCount + 1, lastError = code)
+                }
+                database.pendingSync().upsert(updated)
+                failed += updated
+                Log.e(TAG, "Queued photo upload failed: ${updated.lastError}")
             }
         }
         if (ready.isEmpty()) {
-            publishSyncCentre(note = getApplication<Application>().getString(R.string.sync_push_failed), busy = false)
+            val offline = failed.any { it.lastError == SyncAttempt.OFFLINE }
+            publishSyncCentre(
+                note = if (offline) {
+                    syncNote(online = false)
+                } else {
+                    getApplication<Application>().getString(R.string.sync_push_failed)
+                },
+                busy = false,
+                written = failed,
+            )
             return
         }
         try {
@@ -940,10 +960,15 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             var conflictCount = 0
             for ((row, _) in ready) {
                 val result = byId[row.id]
-                val updated = if (result == null) {
-                    row.copy(retryCount = row.retryCount + 1, lastError = "push")
+                val applied = if (result == null) {
+                    row
                 } else {
                     SyncAttempt.apply(row, result.result, result.code)
+                }
+                val updated = if (applied.status == SyncStatus.PENDING && applied.retryCount == row.retryCount) {
+                    SyncAttempt.retry(row, online = true)
+                } else {
+                    applied
                 }
                 if (updated.status == SyncStatus.ACK) {
                     ackCount += 1
@@ -962,9 +987,20 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 busy = false,
             )
         } catch (error: Exception) {
+            val online = !TransportFailure.isOffline(error) && DeviceNetwork.isOnline(getApplication())
+            val written = ready.map { (row, _) -> SyncAttempt.retry(row, online = online) }
+            written.forEach { database.pendingSync().upsert(it) }
             val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
             Log.e(TAG, "Sync push failed: $reason")
-            publishSyncCentre(note = getApplication<Application>().getString(R.string.sync_push_failed), busy = false)
+            publishSyncCentre(
+                note = if (online) {
+                    getApplication<Application>().getString(R.string.sync_push_failed)
+                } else {
+                    syncNote(online = false)
+                },
+                busy = false,
+                written = written,
+            )
         }
     }
 
@@ -983,11 +1019,21 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         files
     }
 
-    private suspend fun publishSyncCentre(note: String, busy: Boolean) {
+    private suspend fun publishSyncCentre(
+        note: String,
+        busy: Boolean,
+        written: List<PendingSyncOperation> = emptyList(),
+    ) {
         try {
             val database = MuniPulseDatabase.get(getApplication())
             val settings = database.localSettings().read()
-            val rows = database.pendingSync().list()
+            val saved = written.associateBy { it.id }
+            val rows = database.pendingSync().list().map { saved[it.id] ?: it }.toMutableList()
+            for (row in saved.values) {
+                if (rows.none { it.id == row.id }) {
+                    rows += row
+                }
+            }
             for (row in rows) {
                 if (row.status == SyncStatus.ACK) {
                     database.pendingSync().delete(row.id)
