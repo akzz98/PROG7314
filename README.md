@@ -1,36 +1,44 @@
 # MuniPulse SA
 
-Citizen Service Delivery and Community Incident Tracker for South African wards. This repository is the Part 2 prototype for PROG7314 / OPSC7312, student Alton Muganda (St10263456), solo.
+Citizen Service Delivery and Community Incident Tracker for South African wards. This repository is the Final POE for PROG7314 / OPSC7312, student Alton Muganda (St10263456), solo. The app version is `1.0.0` (`versionCode` 2).
 
 ## Purpose
 
-A resident signs in with Google, reports a municipal fault with a photo and a GPS fix, and sees the open reports in their ward. People upvote the same problem so it ranks as one ward signal. A field worker appends milestones, and the resident follows that timeline while online.
+A resident signs in with Google, reports a municipal fault with a photo and a GPS fix, and follows that report from the ward list. People upvote the same problem so it ranks as one ward signal. A field worker appends milestones. The phone can work offline, show water and evacuation points for the ward, and show an impact score that the server calculates.
 
 ## Stack
 
 | Layer | Choice |
 | --- | --- |
 | Android client | Kotlin, MVVM, Jetpack Compose, Coroutines and Flow, Retrofit 2 |
+| On-device store | Room for the settings mirror, the offline queue, and cached map points |
 | Session | Firebase Authentication with Google SSO, then an HMAC API JWT in encrypted preferences |
+| Unlock | Optional `BiometricPrompt` on a cold start, with Google sign-in as the fallback |
+| Push | Firebase Cloud Messaging. The API sends ticket and ward alerts with FCM HTTP v1 |
 | API | ASP.NET Core Web API on .NET 10 |
-| Database | MongoDB Atlas. Collections: `users`, `incidents`, `wards` |
+| Database | MongoDB Atlas. Collections: `users`, `incidents`, `wards`, `media`, `device_tokens`, `emergency_points` |
 | Photos | JPEG upload through a 15-minute Azure Blob link |
 
 ## Architecture
 
-The phone keeps UI state in ViewModels. Retrofit calls the API with the API JWT. Firebase is used only to obtain a Google ID token. `POST /api/v1/auth/session` exchanges that token for the API JWT. The API stores profiles and incidents in MongoDB and writes photo files to disk. A field worker publishes milestones with a field-worker JWT or the demo API key.
+The phone keeps UI state in ViewModels. Retrofit calls the API with the API JWT. Firebase Authentication is used to obtain a Google ID token. `POST /api/v1/auth/session` exchanges that token for the API JWT. Room holds only device state. MongoDB remains the record for profiles, incidents, milestones, emergency points, and push tokens. Photo bytes go to Azure Blob. A field worker publishes milestones with a field-worker JWT or the demo API key. After that save, the API may send a data-only FCM message. The phone draws the notification and opens the incident or the ward home when it is tapped.
 
 ```mermaid
 flowchart TB
   subgraph client [Android app]
     UI[Jetpack Compose screens]
     VM[MVVM ViewModels]
+    Room[(Room queue settings map cache)]
     HTTP[Retrofit]
-    UI --> VM --> HTTP
+    UI --> VM
+    VM --> Room
+    VM --> HTTP
   end
 
-  SSO[Firebase Authentication Google SSO]
-  VM -->|Google sign-in| SSO
+  SSO[Firebase Authentication]
+  FCM[Firebase Cloud Messaging]
+  VM -->|Google sign-in and biometric fallback| SSO
+  VM -->|register device token| FCM
 
   subgraph server [MuniPulse.Api]
     Routes["REST /api/v1"]
@@ -38,40 +46,38 @@ flowchart TB
 
   SSO -->|Firebase ID token| Routes
   HTTP -->|Bearer API JWT| Routes
-  Routes --> Mongo[(MongoDB users incidents media)]
+  Routes --> Mongo[(MongoDB)]
   Routes --> Blob[Azure Blob incident JPEGs]
-  Marker[Field-worker demo key] -->|milestones| Routes
+  Routes -->|ticket and area push| FCM
+  Marker[Field-worker demo key] -->|milestones and area alerts| Routes
 ```
 
-## Part 2 and Final POE
+Biometric unlock is local. It does not replace the API JWT. Marketing notifications stay on the phone and are never pushed. The emergency map does not use a map-provider key.
 
-Part 2 includes Google SSO, Settings, the custom API and database, and custom features UD-1 (photo + GPS), UD-2 (upvotes and ward aggregation), and UD-3 (resolution timeline).
-
-English, isiZulu, biometric unlock, Azure Blob photos, the Room queue, FCM ticket and ward alerts, the emergency map (UD-4), and impact scores (UD-5) are in this build. The map draws seeded water and evacuation points on the phone. It does not use a map-provider key. With no network, **Navigate cached** opens the last points saved for that ward. A valid report with no network is stored on the phone and the form says it is queued.
-
-## Layout
+## Repository layout
 
 ```
 android/          Jetpack Compose app (application id com.munipulse)
 api/              MuniPulse.slnx and MuniPulse.Api
+play-listing/     Play Store text and the screenshot folder
 ```
 
-## Version control and GitHub Actions
+## GitHub Actions
 
-This is one Git repository. `android/` is the Compose app and `api/` is the ASP.NET Core solution. Commit source, the Gradle wrapper, `google-services.json.example`, and `appsettings.json` with the secret fields left empty. The root `.gitignore` keeps local files out of history: `google-services.json`, `local.properties`, `appsettings.Development.json`, `App_Data/`, build output, and `CHECKLIST.md`.
+This is one Git repository. Commit source, the Gradle wrapper, `google-services.json.example`, and `appsettings.json` with the secret fields left empty. The root `.gitignore` keeps local files out of history: `google-services.json`, `local.properties`, `*.keystore`, `appsettings.Development.json`, `App_Data/`, build output, APK and AAB files, and `CHECKLIST.md`. There is no zip of the source tree. `android/gradle/wrapper/gradle-wrapper.jar` is the Gradle wrapper, not a source dump.
 
-Every push runs two workflows. Each job checks out the repository with read-only permission and defines no secrets.
+Every push runs two workflows. Each job checks out the repository with read-only permission and defines no secrets. Neither workflow filters the test task, so the F3 SAS tests, the F4 sync tests, and the F7 impact tests run with the rest of the suite.
 
 | Workflow | File | What a push runs |
 | --- | --- | --- |
 | API | `.github/workflows/api.yml` | .NET 10 SDK, then `dotnet test api/MuniPulse.slnx` |
 | Android | `.github/workflows/android.yml` | JDK 21, Android compile SDK 37, then `:app:testDebugUnitTest` |
 
-The API job uses the empty MongoDB connection string and the empty JWT signing key in `appsettings.json`. The Android job copies `google-services.json.example` into the gitignored Firebase file and does not call Firebase. GitHub-hosted runners do not include the Android SDK, so that job installs platform 37. It does not start an emulator. If platform 37 is missing from the SDK manager, the Android job cannot compile.
+The API job uses the empty MongoDB connection string and the empty JWT signing key in `appsettings.json`. The Android job copies `google-services.json.example` into the gitignored Firebase file and does not call Firebase. GitHub-hosted runners do not include the Android SDK, so that job installs platform 37. It does not start an emulator.
 
 ## Setup
 
-Keep the Atlas connection string, the Azure Storage connection string, the JWT signing key, the field-worker demo key, and `google-services.json` on your machine. The commands below use [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) for the API. You can use a gitignored `appsettings.Development.json` instead, copied from `api/MuniPulse.Api/appsettings.Development.json.example`.
+Keep the Atlas connection string, the Azure Storage connection string, the JWT signing key, the Firebase service account, the field-worker demo key, and `google-services.json` on your machine. The commands below use [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) for the API. You can use a gitignored `appsettings.Development.json` instead, copied from `api/MuniPulse.Api/appsettings.Development.json.example`.
 
 ### MongoDB
 
@@ -81,7 +87,7 @@ Create a MongoDB Atlas cluster and a database user. The API database name is `mu
 dotnet user-secrets set "MongoDb:ConnectionString" "<atlas-connection-string>" --project api/MuniPulse.Api
 ```
 
-On startup the API creates indexes and seeds wards `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, and `TSH-04`, plus the user `demo-field-worker`. With an empty connection string, `/health` still returns ok and data routes return `503 DATABASE_UNAVAILABLE`.
+On startup the API creates indexes and seeds wards `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, and `TSH-04`, the user `demo-field-worker`, and the water and evacuation points. With an empty connection string, `/health` still returns ok and data routes return `503 DATABASE_UNAVAILABLE`.
 
 ### Azure Blob
 
@@ -103,13 +109,13 @@ dotnet user-secrets set "Jwt:SigningKey" "<at-least-32-random-characters>" --pro
 
 ### FCM service account
 
-Ticket and area pushes use FCM HTTP v1 through the Firebase Admin SDK. Put the service-account JSON in user-secrets (one line). Leave it empty to skip sends without failing milestone or area-alert writes.
+Ticket and area pushes use FCM HTTP v1 through the Firebase Admin SDK. Put the service-account JSON in user-secrets as one line. Leave it empty to skip sends without failing milestone or area-alert writes.
 
 ```powershell
 dotnet user-secrets set "Firebase:ServiceAccountJson" "{...service-account json...}" --project api/MuniPulse.Api
 ```
 
-Enable Cloud Messaging in the Firebase console for `munipulse-987ce`. Field workers trigger ward alerts with `POST /api/v1/alerts/area` (field-worker JWT or `X-Demo-Api-Key`). Marketing preference stays local and is never pushed.
+Enable Cloud Messaging in the Firebase console for `munipulse-987ce`. Field workers trigger ward alerts with `POST /api/v1/alerts/area`. Marketing stays local and is never pushed.
 
 ### Firebase
 
@@ -134,7 +140,7 @@ The app reads `API_BASE_URL` from `android/local.properties` (gitignored). Start
 
 Debug builds allow cleartext HTTP. A release build sets `usesCleartextTraffic` to false and refuses to assemble unless `API_BASE_URL` starts with `https://`.
 
-The release version is `versionName` `1.0.0` (`versionCode` 2). Minify stays off because Gson and Retrofit use model field names. Signing reads a gitignored keystore from `android/local.properties`:
+Signing reads a gitignored keystore from `android/local.properties`:
 
 ```
 RELEASE_STORE_FILE=release.keystore
@@ -143,7 +149,7 @@ RELEASE_KEY_ALIAS=munipulse
 RELEASE_KEY_PASSWORD=<local password>
 ```
 
-`android/release.keystore` is covered by `*.keystore` in `.gitignore`. Create it on this machine only. The Play listing text is in `play-listing/`. Phone screenshots are listed in `play-listing/screenshots/README.md` and are added after a device run.
+`android/release.keystore` is covered by `*.keystore` in `.gitignore`. Create it on this machine only. Minify stays off because Gson and Retrofit use model field names. The Play listing text is in `play-listing/`.
 
 ### Field-worker demo path
 
@@ -157,15 +163,18 @@ Choose that value yourself and leave it out of git. Create an incident, copy its
 
 A Development host can also accept session aliases `dev-citizen` and `dev-field-worker` when `Auth:AllowDevBypass` is true. Copy the Development example to `appsettings.Development.json`. Those aliases are refused outside Development.
 
-## Run the API
+## How to run
+
+### API
 
 Requires the .NET 10 SDK.
 
 ```powershell
 dotnet run --project api/MuniPulse.Api --launch-profile http
+dotnet test api/MuniPulse.slnx
 ```
 
-`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, SAS request validation, the sync push contract, the 250 metre duplicate window, push preference and copy rules, the emergency-point seed for each demo ward, impact score rules, a citizen token that cannot write a badge, the field-worker demo key comparison, and unauthenticated calls (including area alerts and emergency points). They do not need Firebase, MongoDB, Azure, a map key, or a JWT signing key. The API workflow runs the same command on every push.
+`dotnet test` covers create validation, SAS request validation, the sync push contract, the 250 metre duplicate window, push preference and copy, the emergency-point seed, impact score rules, a citizen token that cannot write a badge, the field-worker key comparison, and unauthenticated calls. The tests do not need Firebase, MongoDB, Azure, a map key, or a JWT signing key. The API workflow runs the same command on every push.
 
 Health check: [http://localhost:5285/health](http://localhost:5285/health)
 
@@ -173,9 +182,18 @@ Health check: [http://localhost:5285/health](http://localhost:5285/health)
 { "status": "ok", "app": "MuniPulse SA" }
 ```
 
-Secrets and the phone's API address are set in [Setup](#setup).
+### Android
 
-### Domain API
+Open `android/` in Android Studio (AGP 9.4, Gradle 9.6, compile SDK 37). Studio writes `sdk.dir` into `android/local.properties`. Set `API_BASE_URL` as described above.
+
+```powershell
+cd android
+.\gradlew.bat :app:testDebugUnitTest
+```
+
+That task runs the incident form validator, language codes, biometric availability, the offline queue, and the sync conflict rule. It does not need Firebase, MongoDB, or a device. The Android workflow runs the same task on every push.
+
+## Domain API
 
 Routes live under `/api/v1`. Failures use the planning error envelope (`error.code`, `message`, `fields`, `correlationId`). `/health` does not need the database. Data routes return `503 DATABASE_UNAVAILABLE` until `MongoDb:ConnectionString` is set.
 
@@ -187,18 +205,20 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 | POST | `/api/v1/me/badges` | Bearer API JWT. Always `403 BADGE_FORBIDDEN`. A citizen cannot award `VerifiedReporter`. |
 | POST | `/api/v1/media/sas` | Bearer API JWT. Body is `contentType` (`image/jpeg`) and `byteSize` (1 to 5 MB). Returns `photoId`, `uploadUrl`, and `expiresAt`. The link lasts 15 minutes. The app uploads the JPEG to that URL. |
 | POST | `/api/v1/sync/push` | Bearer API JWT. A batch of 1 to 20 queued `createIncident` operations. Each result is `ack` or `conflict`. Photos are uploaded with the media link first. |
-| POST, DELETE | `/api/v1/devices/fcm-token` | Bearer API JWT. POST body is `token` and `platform` (`android`). Stores the device push token. DELETE removes that user's tokens. Sign-out calls DELETE. |
-| POST, GET | `/api/v1/incidents` and `/api/v1/incidents/{id}` | Bearer API JWT. Detail photos include a short-lived read URL when the blob is recorded. |
+| POST, DELETE | `/api/v1/devices/fcm-token` | Bearer API JWT. POST body is `token` and `platform` (`android`). DELETE removes that user's tokens. Sign-out calls DELETE. |
+| POST, GET | `/api/v1/incidents` and `/api/v1/incidents/{id}` | Bearer API JWT. Detail photos include a short-lived read URL when the blob is recorded. Detail includes the stored latitude and longitude. |
 | GET | `/api/v1/emergency/points` | Bearer API JWT. Query `wardCode`. Returns seeded water and evacuation points for that demo ward. |
 | GET | `/api/v1/incidents/aggregates` | Bearer API JWT. Open reports in the ward, grouped when they share an `aggregateId`. |
 | GET | `/api/v1/incidents/nearby` | Bearer API JWT. Open reports in the same ward and category within 250 metres and 14 days. |
 | POST | `/api/v1/incidents/{id}/upvotes` | Bearer API JWT. One vote per user. |
-| POST | `/api/v1/incidents/{id}/milestones` | FieldWorker role, or header `X-Demo-Api-Key`. Appends Assigned, OnSite, Resolved, or Note and returns the timeline in time order. After save, may send a ticket-status FCM push to the reporter when prefs allow. |
-| POST | `/api/v1/devices/fcm-token` | Bearer session. Stores the device FCM registration id. |
-| DELETE | `/api/v1/devices/fcm-token` | Bearer session. Clears that device token (also on sign-out). |
+| POST | `/api/v1/incidents/{id}/milestones` | FieldWorker role, or header `X-Demo-Api-Key`. Appends Assigned, OnSite, Resolved, or Note. After save, may send a ticket-status push when the reporter's preference is on. |
 | POST | `/api/v1/alerts/area` | FieldWorker role, or header `X-Demo-Api-Key`. Body `{ "wardCode", "note" }`. Pushes an area alert to users with that default ward and area emergencies on. |
 
-Demo wards seeded into MongoDB: `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, `TSH-04`. Categories: `Pothole`, `WaterLeak`, `IllegalDumping`, `Streetlight`, `Sewage`, `Other`.
+Demo wards: `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, `TSH-04`. Categories: `Pothole`, `WaterLeak`, `IllegalDumping`, `Streetlight`, `Sewage`, `Other`.
+
+A new report joins an open report in the same ward and category when it is within 250 metres and 14 days. Both then share an `aggregateId`. Sending the same `clientMutationId` again returns `409 DUPLICATE_MUTATION` and does not create a second incident. Sample calls are in `api/MuniPulse.Api/MuniPulse.Api.http`.
+
+Logs record the user id, the HTTP method, path, status, and correlation id. They record an exception type when something fails. They do not record tokens, connection strings, coordinates, or descriptions.
 
 ### Impact score (UD-5)
 
@@ -214,52 +234,47 @@ Demo wards seeded into MongoDB: `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, `TSH-04`
 
 A citizen account never receives `VerifiedReporter` from this calculation. `POST /api/v1/me/badges` and a profile patch that includes a score or badges return `403 BADGE_FORBIDDEN`. The result is saved on the user document after it is calculated.
 
-A Development host with `Auth:AllowDevBypass` set to true accepts `firebaseIdToken` values `dev-citizen` and `dev-field-worker` and returns an API JWT. Those aliases are refused in any other environment. See [Setup](#setup).
+## Android app
 
-### Milestone without a staff app
+Cold start stays on the splash while the saved session is checked. A valid session opens Home. If biometric unlock is on, that gate appears first. Success opens Home. Failure stays on the gate. Google sign-in is the fallback. With no session, first launch shows three onboarding pages, then Google sign-in. Sign-out returns to sign-in and does not show those pages again.
 
-Follow [Field-worker demo path](#field-worker-demo-path). The log records the user id. It does not record the token or the key.
+Home is the ward pulse. **Report** is on that screen, so a signed-in person reaches it in one tap. The bottom bar is Home, My, Map, and Settings. Map opens the emergency points for the current ward. **Navigate cached** opens the last points saved in Room when the phone is offline or the load fails. The screen says the points are not for 112 or live dispatch. Empty and failed loads use the same empty, loading, and retry pattern as the other lists, in English and isiZulu.
 
-A new report joins an open report in the same ward and category when it is within 250 metres and 14 days. Both then share an `aggregateId`. Otherwise `aggregateId` stays null. A stored photo's `url` is a short-lived Azure read link. Sending the same `clientMutationId` again returns `409 DUPLICATE_MUTATION` and does not create a second incident.
+**My** lists this account's reports. A row opens the incident: status, description, photos, upvote, timeline, and the stored location. **Upvote** adds one vote. A second vote returns `409 ALREADY_UPVOTED`. Settings holds the ward, language (`en` or `zu`), notification switches, biometric switch, sync centre, privacy note, and sign-out. Profile shows the name, masked email, ward, language, role, score, badges, report count, and upvotes received. A user with no reports sees zero.
 
-Sample calls are in `api/MuniPulse.Api/MuniPulse.Api.http`.
+The report form checks the category, a description of 10 to 1000 characters, a latitude and longitude, accuracy when a fix has one, the ward, and at most three photos. Invalid input stays on the screen. With no network, a valid report is stored on the phone and the form says it is queued. **Sync now** uploads queued photos and calls `POST /api/v1/sync/push`. A resolved report keeps the server description when a queued edit conflicts with it.
 
-## Run the Android app
+After sign-in the app registers an FCM token. Sign-out deletes it. A ticket push opens that incident. An area push opens Home for that ward. Copy is English or isiZulu from the profile language.
 
-Open `android/` in Android Studio (AGP 9.4, Gradle 9.6, compile SDK 37). Studio writes `sdk.dir` into `android/local.properties`. Set `API_BASE_URL` as described in [API URL](#api-url).
+Protected routes return `401 UNAUTHENTICATED` when the token is missing and `401 INVALID_TOKEN` when it is invalid or expired.
 
-From `android/`, `.\gradlew.bat :app:testDebugUnitTest` runs the incident form validator tests. Those tests do not need Firebase, MongoDB, or a device. The Android workflow runs the same task on every push.
+## Screenshots
 
-### Google sign-in
+Take these on a physical phone and save the PNG files in `play-listing/screenshots/`. The folder is listed in the repository. The image files are added after that device run.
 
-The login screen (S03) uses Firebase Authentication. The Google services plugin is `com.google.gms.google-services` 4.5.0. It is declared in `android/build.gradle.kts` and applied in `android/app/build.gradle.kts`. The Firebase BoM is 34.19.0.
+| File | Screen |
+| --- | --- |
+| `01-sso.png` | Google sign-in |
+| `02-settings.png` | Settings, including the privacy note |
+| `03-report.png` | Create report |
+| `04-offline-sync.png` | Sync centre with a queued report, or after reconnect |
+| `05-map.png` | Emergency map for a demo ward |
 
-Follow [Firebase](#firebase), then tap **Continue with Google**.
+## Release notes
 
-After Google sign-in, the app sends the Firebase ID token to `POST /api/v1/auth/session`. The API JWT is stored in encrypted preferences and removed on sign-out. A later launch reuses it until it expires. Logs record the Firebase uid, the API user id, the HTTP method, path, status, and correlation id. They record an exception type when something fails. They do not record the Firebase ID token, the API JWT, the Authorization header, or a MongoDB connection string.
+Changes since the Part 2 prototype. UD-4 and UD-5 are the two features added for this version.
 
-Cold start stays on the splash while that session is checked. A valid session opens Home. With no session, first launch shows three onboarding pages (photo and GPS, crowd-rank, milestones), then the Google sign-in screen. Sign-out returns to sign-in and does not show those pages again.
+| Area | What changed |
+| --- | --- |
+| Language | English and isiZulu for the visible screens, including empty and error copy. The choice is saved with `PATCH /api/v1/me`. |
+| Biometric unlock | Optional cold-start gate. Google sign-in remains the fallback. |
+| Photos | Incident JPEGs upload through `POST /api/v1/media/sas` to Azure Blob. A missing storage account does not save a report that includes photos. |
+| Offline sync | Room queue, sync centre, and `POST /api/v1/sync/push`. The same client mutation is acknowledged. A queued edit does not reopen a resolved report. |
+| Push | Device token registration, ticket-status pushes, and ward area alerts. Marketing is not pushed. A missing service account skips the send and still saves the milestone. |
+| UD-4 Emergency map | `GET /api/v1/emergency/points` returns seeded water and evacuation points. The map draws them on the phone. **Navigate cached** uses the Room copy. Incident detail shows the stored location. |
+| UD-5 Impact score | `GET /api/v1/me/impact` returns the server score, badges, report count, and upvote count. A citizen cannot write `VerifiedReporter`. |
+| Release | Version `1.0.0`. Launcher icon is a pulse ring, municipal shield, and centre pin. Play listing text is in `play-listing/`. |
 
-Home is the ward pulse. It shows the default ward, a count of open incidents in that ward, and each open report as a category, a short place line, and an upvote count. **Report** is on that screen, so a signed-in person reaches it in one tap. The ward menu uses the same five demo wards. The bell opens notification preferences and the profile icon opens Profile. The bottom bar has Home, My, Map, and Settings. Map stays on the bar, stays disabled, and is labelled Final POE. It does not open a screen. **Ward hotspots** opens from Home and calls `GET /api/v1/incidents/aggregates`. Each row is one server group: same ward, same category, within 250 metres, and reported in the last 14 days. The row shows the report count and the upvote total, and opens the highest-voted report in that group. A grouped report says so on its detail screen. **My** lists this account's reports from `GET /api/v1/incidents?scope=mine`, with a filter for all, submitted, in progress, or resolved. An empty ward list, an empty My list, and a failed load each explain what happened. Empty lists offer **Report**. A failed load offers **Retry**. A row on Home or My opens the incident: status, description, photos, upvote count, and the timeline from oldest to newest. Each event shows the type, time, role, and note. **Refresh** loads that incident again, so a milestone posted while the screen is open appears without leaving the page. **Upvote** adds one vote for the signed-in person. The count and **You upvoted** show on the detail screen, the ward pulse, and My incidents. A second vote returns `409 ALREADY_UPVOTED` and does not increase the count. Creating a report already counts as that person's vote. The live map is not on that screen yet. The pulse calls `GET /api/v1/incidents?scope=ward`. Detail calls `GET /api/v1/incidents/{id}`. Logcat records the ward code and how many open incidents loaded, or an error code. It does not record coordinates or the description. Settings, opened from that bar, shows the display name, a masked email, and the default ward (JHB-23, JHB-24, CPT-11, DBN-07, TSH-04). Sign out is on Settings.
-
-When a session exists, the app calls `GET /api/v1/me`. Changing the ward or ticket-status and area-emergency switches calls `PATCH /api/v1/me`. Marketing and news stay on the device and are not sent. If the API is unreachable, the change stays local and Settings says so. The next successful sync sends that change. Preferred language is English or isiZulu. Settings opens a language screen, saves `en` or `zu` with `PATCH /api/v1/me`, and the open screens switch without reinstalling the app.
-
-Settings opens notification preferences: ticket status and area emergencies start on, and marketing and news start off. Those three choices stay on the device. After sign-in the app registers an FCM token with `POST /api/v1/devices/fcm-token`. Sign-out clears that token. Ticket and ward push delivery is still to come.
-
-Language opens from Settings and switches the app between English and isiZulu. Biometric unlock can be turned on in Settings. A cold start then asks for a fingerprint or face before Home, with Google sign-in as the fallback. Settings opens the sync centre. It lists queued reports, the last sync time, a retry on each queued report, and **Sync now**. An empty queue has its own message. With a network connection, **Sync now** uploads the queued photos and calls `POST /api/v1/sync/push`. Each report comes back as sent or a conflict. The same `clientMutationId` returns the existing incident and the queue marks that report sent. A queued description edit against a report that is already resolved does not change that status. The sync centre says the server description was kept.
-
-Settings includes a POPIA-style privacy note: name, email, ward, location, and photos are kept only for this demo, and location and photos are used to report a fault.
-
-Settings opens Profile. That screen shows the name, masked email, default ward, language, role, and the server impact score: points, badges, report count, and upvotes received. A user with no reports sees zero.
-
-Home opens **New incident**. The form has a category (pothole, water leak, illegal dumping, streetlight, sewage, or other), a description, up to three photo previews from the camera or gallery, and a GPS line with **Refresh GPS**. Denying camera, gallery, or location stays on the screen and does not close the app. **Submit report** checks the category, a description of 10 to 1000 characters, a latitude and longitude, accuracy when a fix has one, the default ward, and a maximum of three photos. Invalid input stays on the screen. When a location is set, the form asks `GET /api/v1/incidents/nearby` and can expand **Nearby duplicates** with the category, a short place line, the upvote count, and the distance. A valid form asks for an upload link, puts each JPEG in Azure Blob, then `POST /api/v1/incidents` with a stable `clientMutationId`. If the phone has no network, the same form stores the draft and the photo files on the device and says the report is queued. It does not close. If a photo upload fails, the form stays open and the incident is not created. A retry of that same form returns the already-submitted message instead of a second row. Logcat records permission results, the photo id, the upload status, create success or failure, and the accuracy in metres. It does not record the coordinates, the description, a token, or the upload link.
-
-Protected API routes require that bearer token. A missing token returns `401 UNAUTHENTICATED`. An invalid or expired token returns `401 INVALID_TOKEN`.
-
-The SDK used for the scaffold compile is `%LOCALAPPDATA%\Android\Sdk` (platform 37). `android/local.properties` is generated locally and gitignored. `ANDROID_HOME` does not need to be set when that file contains `sdk.dir`.
-
-## Still to come
-
-Screenshots and the unlisted demo video link are added in milestone M9.
+## Demo video
 
 **Demo video: TBD**

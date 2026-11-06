@@ -17,5 +17,6 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      # Full suite, including F3 SAS, F4 sync push, and F7 impact rules. No test filter.
       - name: Build and test
         run: dotnet test api/MuniPulse.slnx --nologo

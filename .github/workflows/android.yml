@@ -25,6 +25,7 @@ jobs:
         run: sdkmanager "platforms;android-37.0"
       - name: Use the placeholder Firebase file
         run: cp android/app/google-services.json.example android/app/google-services.json
+      # Full unit-test task, including the F4 queue and conflict tests. No test filter.
       - name: Unit tests
         working-directory: android
         run: chmod +x ./gradlew && ./gradlew :app:testDebugUnitTest --no-daemon
