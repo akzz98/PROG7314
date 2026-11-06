@@ -147,11 +147,13 @@ public sealed class IncidentStore
     {
         try
         {
-            return await EmergencyPoints()
+            var points = await EmergencyPoints()
                 .Find(point => point.WardCode == wardCode)
-                .SortBy(point => point.Kind)
-                .ThenBy(point => point.Name)
                 .ToListAsync(cancellationToken);
+            return points
+                .OrderBy(point => point.Kind, StringComparer.Ordinal)
+                .ThenBy(point => point.Name, StringComparer.Ordinal)
+                .ToArray();
         }
         catch (MongoException ex)
         {

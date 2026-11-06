@@ -10,4 +10,4 @@ Take these on a physical phone after the release or debug build is installed. Sa
 | `04-offline-sync.png` | Sync centre with a queued report, or after reconnect |
 | `05-map.png` | Emergency map for a demo ward |
 
-The listing text in the parent folder is ready. These five images are still required for the full Play pack.
+The listing text in the parent folder is ready. The five phone screenshots are saved in this folder.
