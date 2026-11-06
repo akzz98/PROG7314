@@ -156,6 +156,10 @@ fun MuniPulseApp(
                 viewModel.clearNearby()
                 showReport = false
             },
+            onFinished = {
+                viewModel.clearNearby()
+                showReport = false
+            },
         )
         current is SignInUiState.SignedIn && !showReport && biometricEnabled && !biometricUnlocked -> BiometricGateScreen(
             working = gateWorking,

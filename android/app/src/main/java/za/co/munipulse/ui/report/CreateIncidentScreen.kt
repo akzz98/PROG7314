@@ -35,7 +35,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
@@ -68,6 +70,7 @@ fun CreateIncidentScreen(
     onClearNearby: () -> Unit,
     onSubmit: suspend (IncidentDraft, List<Uri>, String) -> IncidentSubmitResult,
     onBack: () -> Unit,
+    onFinished: () -> Unit = onBack,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -84,6 +87,8 @@ fun CreateIncidentScreen(
     var submitting by remember { mutableStateOf(false) }
     var submitNote by remember { mutableStateOf<String?>(null) }
     var submitFailed by remember { mutableStateOf(false) }
+    var successTitle by remember { mutableStateOf<String?>(null) }
+    var successBody by remember { mutableStateOf<String?>(null) }
     val mutationId = remember { java.util.UUID.randomUUID().toString() }
     var fieldErrors by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var access by remember { mutableStateOf(MediaPermissions.current(context)) }
@@ -208,6 +213,40 @@ fun CreateIncidentScreen(
 
     LaunchedEffect(Unit) {
         Log.i(TAG, "Opened create incident")
+    }
+    val finish by rememberUpdatedState(onFinished)
+    val shownTitle = successTitle
+    val shownBody = successBody
+    if (shownTitle != null && shownBody != null) {
+        BackHandler(onBack = finish)
+        LaunchedEffect(shownTitle) {
+            delay(1800)
+            finish()
+        }
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = shownTitle,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = shownBody,
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        return
     }
     BackHandler(onBack = onBack)
 
@@ -429,17 +468,20 @@ fun CreateIncidentScreen(
                         is IncidentSubmitResult.Created -> {
                             formAccepted = true
                             submitFailed = false
-                            submitNote = context.getString(R.string.report_saved, result.incidentId)
+                            successTitle = context.getString(R.string.report_success_sent)
+                            successBody = context.getString(R.string.report_success_sent_body)
                         }
                         IncidentSubmitResult.AlreadySubmitted -> {
                             formAccepted = true
                             submitFailed = false
-                            submitNote = context.getString(R.string.report_duplicate)
+                            successTitle = context.getString(R.string.report_success_duplicate)
+                            successBody = context.getString(R.string.report_duplicate)
                         }
                         IncidentSubmitResult.Queued -> {
                             formAccepted = true
                             submitFailed = false
-                            submitNote = context.getString(R.string.report_queued)
+                            successTitle = context.getString(R.string.report_success_queued)
+                            successBody = context.getString(R.string.report_queued)
                         }
                         is IncidentSubmitResult.Failed -> {
                             formAccepted = false

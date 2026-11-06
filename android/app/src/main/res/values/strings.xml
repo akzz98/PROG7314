@@ -126,6 +126,10 @@
     <string name="report_saved">Report saved. %1$s</string>
     <string name="report_queued">Queued on this phone. It will send when you are back online.</string>
     <string name="report_duplicate">This report was already submitted.</string>
+    <string name="report_success_sent">Report sent</string>
+    <string name="report_success_sent_body">Your report was sent.</string>
+    <string name="report_success_queued">Saved on this phone</string>
+    <string name="report_success_duplicate">Already sent</string>
     <string name="report_send_failed">The report was not sent. Try again.</string>
     <string name="report_photo_failed">A photo could not be prepared.</string>
     <string name="report_photo_upload">A photo could not be uploaded. The report was not sent.</string>
