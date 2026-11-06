@@ -62,6 +62,7 @@ fun MuniPulseApp(
     val detailRefreshNote by viewModel.detailRefreshNote.collectAsState()
     val upvoteBusy by viewModel.upvoteBusy.collectAsState()
     val hotspots by viewModel.hotspots.collectAsState()
+    val emergencyMap by viewModel.emergencyMap.collectAsState()
     val nearby by viewModel.nearby.collectAsState()
     val biometricEnabled by viewModel.biometricEnabled.collectAsState()
     val biometricUnlocked by viewModel.biometricUnlocked.collectAsState()
@@ -254,6 +255,9 @@ fun MuniPulseApp(
             onOpenIncident = { detailId = it },
             onOpenHotspots = { showHotspots = true },
             onOpenReport = { showReport = true },
+            emergencyMap = emergencyMap,
+            onRefreshMap = { viewModel.refreshEmergencyMap(current.defaultWardCode) },
+            onNavigateCached = { viewModel.showCachedEmergencyMap(current.defaultWardCode) },
             onOpenNotifications = { showNotifications = true },
             onOpenProfile = { showProfile = true },
             onOpenSettings = { showSettings = true },

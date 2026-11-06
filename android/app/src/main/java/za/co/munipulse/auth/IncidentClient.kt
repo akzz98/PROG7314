@@ -103,6 +103,14 @@ object IncidentClient {
         return response.body()?.items.orEmpty()
     }
 
+    suspend fun emergencyPoints(accessToken: String, wardCode: String): List<EmergencyPointBody> {
+        val response = api.emergencyPoints(bearer(accessToken), wardCode)
+        if (!response.isSuccessful) {
+            throw incidentError(response)
+        }
+        return response.body()?.items.orEmpty()
+    }
+
     suspend fun listAggregates(accessToken: String, wardCode: String): List<AggregateBody> {
         val response = api.aggregates(bearer(accessToken), wardCode)
         if (!response.isSuccessful) {
@@ -235,6 +243,12 @@ private interface IncidentApi {
         @Query("wardCode") wardCode: String,
     ): Response<NearbyListBody>
 
+    @GET("api/v1/emergency/points")
+    suspend fun emergencyPoints(
+        @Header("Authorization") authorization: String,
+        @Query("wardCode") wardCode: String,
+    ): Response<EmergencyPointsBody>
+
     @GET("api/v1/incidents/aggregates")
     suspend fun aggregates(
         @Header("Authorization") authorization: String,
@@ -358,11 +372,24 @@ sealed interface UpvoteOutcome {
     data object Already : UpvoteOutcome
 }
 
+data class EmergencyPointsBody(val items: List<EmergencyPointBody> = emptyList())
+
+data class EmergencyPointBody(
+    val id: String = "",
+    val wardCode: String = "",
+    val kind: String = "",
+    val name: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+)
+
 data class IncidentDetailBody(
     val id: String = "",
     val category: String = "",
     val description: String = "",
     val status: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
     val upvoteCount: Int = 0,
     val viewerHasUpvoted: Boolean = false,
     val aggregateId: String? = null,

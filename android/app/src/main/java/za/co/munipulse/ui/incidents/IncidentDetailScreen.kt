@@ -44,6 +44,7 @@ import za.co.munipulse.report.PhotoFiles
 import za.co.munipulse.ui.common.ListError
 import za.co.munipulse.ui.common.ListLoading
 import za.co.munipulse.ui.home.categoryName
+import za.co.munipulse.ui.map.LocationSnippet
 
 @Composable
 fun IncidentDetailScreen(
@@ -166,8 +167,9 @@ private fun DetailBody(
         }
     }
     Spacer(modifier = Modifier.height(16.dp))
-    // FINAL POE — the map snippet is not part of this prototype.
-    Text(text = stringResource(R.string.detail_map), style = MaterialTheme.typography.bodyMedium)
+    if (item.latitude in -90.0..90.0 && item.longitude in -180.0..180.0) {
+        LocationSnippet(latitude = item.latitude, longitude = item.longitude)
+    }
 }
 
 @Composable

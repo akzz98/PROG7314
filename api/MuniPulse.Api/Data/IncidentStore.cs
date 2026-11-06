@@ -12,6 +12,7 @@ public sealed class IncidentStore
     private readonly IMongoCollection<WardDocument>? _wards;
     private readonly IMongoCollection<MediaAsset>? _media;
     private readonly IMongoCollection<DevicePushToken>? _deviceTokens;
+    private readonly IMongoCollection<EmergencyPoint>? _emergencyPoints;
     private readonly ILogger<IncidentStore> _logger;
 
     public IncidentStore(IConfiguration configuration, ILogger<IncidentStore> logger)
@@ -40,6 +41,7 @@ public sealed class IncidentStore
             _wards = database.GetCollection<WardDocument>("wards");
             _media = database.GetCollection<MediaAsset>("media");
             _deviceTokens = database.GetCollection<DevicePushToken>("device_tokens");
+            _emergencyPoints = database.GetCollection<EmergencyPoint>("emergency_points");
         }
         catch (Exception ex) when (ex is FormatException or ArgumentException)
         {
@@ -51,7 +53,7 @@ public sealed class IncidentStore
 
     public async Task SeedAsync(CancellationToken cancellationToken)
     {
-        if (_users is null || _incidents is null || _wards is null || _deviceTokens is null)
+        if (_users is null || _incidents is null || _wards is null || _deviceTokens is null || _emergencyPoints is null)
         {
             return;
         }
@@ -116,9 +118,45 @@ public sealed class IncidentStore
             }, cancellationToken: cancellationToken);
         }
 
+        foreach (var point in EmergencyPointCatalog.All)
+        {
+            await _emergencyPoints.ReplaceOneAsync(
+                document => document.Id == point.Id,
+                new EmergencyPoint
+                {
+                    Id = point.Id,
+                    WardCode = point.WardCode,
+                    Kind = point.Kind,
+                    Name = point.Name,
+                    Latitude = point.Latitude,
+                    Longitude = point.Longitude,
+                },
+                new ReplaceOptions { IsUpsert = true },
+                cancellationToken);
+        }
+
         _logger.LogInformation(
-            "MongoDB seed complete. Demo wards: {WardCodes}",
-            string.Join(", ", WardCatalog.All.Select(ward => ward.Code)));
+            "MongoDB seed complete. Demo wards: {WardCodes}. Emergency points: {PointCount}",
+            string.Join(", ", WardCatalog.All.Select(ward => ward.Code)),
+            EmergencyPointCatalog.All.Count);
+    }
+
+    public async Task<IReadOnlyList<EmergencyPoint>> ListEmergencyPointsAsync(
+        string wardCode,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await EmergencyPoints()
+                .Find(point => point.WardCode == wardCode)
+                .SortBy(point => point.Kind)
+                .ThenBy(point => point.Name)
+                .ToListAsync(cancellationToken);
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
     }
 
     public async Task<UserProfile?> FindUserByIdAsync(string id, CancellationToken cancellationToken)
@@ -616,6 +654,9 @@ public sealed class IncidentStore
 
     private IMongoCollection<IncidentReport> Incidents() =>
         _incidents ?? throw NotConfigured();
+
+    private IMongoCollection<EmergencyPoint> EmergencyPoints() =>
+        _emergencyPoints ?? throw NotConfigured();
 
     private static ApiException NotConfigured() =>
         new(

@@ -66,6 +66,14 @@ public class ApiHostTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task EmergencyPointsWithoutATokenAreUnauthorized()
+    {
+        var response = await _client.GetAsync("/api/v1/emergency/points?wardCode=JHB-23");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task AreaAlertWithoutATokenIsUnauthorized()
     {
         var response = await _client.PostAsJsonAsync(

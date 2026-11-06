@@ -19,6 +19,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import za.co.munipulse.R
+import za.co.munipulse.data.CachedMapPoint
 import za.co.munipulse.data.DeviceNetwork
 import za.co.munipulse.data.LocalSettingsMirror
 import za.co.munipulse.data.MuniPulseDatabase
@@ -44,6 +45,8 @@ import za.co.munipulse.ui.incidents.MyIncidentsUi
 import za.co.munipulse.ui.incidents.IncidentTime
 import za.co.munipulse.ui.incidents.TimelineLine
 import za.co.munipulse.ui.incidents.WardHotspotsUi
+import za.co.munipulse.ui.map.EmergencyMapUi
+import za.co.munipulse.ui.map.EmergencyPointItem
 import java.io.File
 
 sealed interface SignInUiState {
@@ -124,6 +127,9 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
     private val _hotspots = MutableStateFlow<WardHotspotsUi>(WardHotspotsUi.Idle)
     val hotspots: StateFlow<WardHotspotsUi> = _hotspots.asStateFlow()
     private var hotspotGeneration = 0
+    private val _emergencyMap = MutableStateFlow<EmergencyMapUi>(EmergencyMapUi.Idle)
+    val emergencyMap: StateFlow<EmergencyMapUi> = _emergencyMap.asStateFlow()
+    private var emergencyGeneration = 0
     private val _upvoteBusy = MutableStateFlow(false)
     val upvoteBusy: StateFlow<Boolean> = _upvoteBusy.asStateFlow()
     private var upvoteInFlight = false
@@ -456,6 +462,8 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                     place = placeLabel(body.description),
                     description = body.description.trim(),
                     status = body.status,
+                    latitude = body.latitude,
+                    longitude = body.longitude,
                     upvoteCount = body.upvoteCount,
                     viewerHasUpvoted = body.viewerHasUpvoted,
                     grouped = !body.aggregateId.isNullOrBlank(),
@@ -586,6 +594,117 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
             }
         }
     }
+
+    fun refreshEmergencyMap(wardCode: String) {
+        val generation = ++emergencyGeneration
+        val ward = WardCatalog.normalize(wardCode)
+        viewModelScope.launch {
+            _emergencyMap.value = EmergencyMapUi.Loading
+            val cached = cachedEmergency(ward)
+            if (!DeviceNetwork.isOnline(getApplication())) {
+                Log.i(TAG, "Emergency map offline. Ward $ward. Cached ${cached.size}")
+                if (generation == emergencyGeneration) {
+                    _emergencyMap.value = EmergencyMapUi.Failed(
+                        getApplication<Application>().getString(R.string.map_offline),
+                        cacheAvailable = cached.isNotEmpty(),
+                    )
+                }
+                return@launch
+            }
+            val token = accessToken
+            if (token.isNullOrBlank()) {
+                Log.w(TAG, "Emergency map skipped. No API session")
+                if (generation == emergencyGeneration) {
+                    _emergencyMap.value = EmergencyMapUi.Failed(
+                        getApplication<Application>().getString(R.string.report_auth),
+                        cacheAvailable = cached.isNotEmpty(),
+                    )
+                }
+                return@launch
+            }
+            try {
+                val points = IncidentClient.emergencyPoints(token, ward)
+                    .filter { it.id.isNotBlank() && it.name.isNotBlank() }
+                    .map { body ->
+                        EmergencyPointItem(
+                            id = body.id,
+                            kind = body.kind,
+                            name = body.name,
+                            latitude = body.latitude,
+                            longitude = body.longitude,
+                        )
+                    }
+                if (generation != emergencyGeneration) {
+                    return@launch
+                }
+                if (points.isEmpty()) {
+                    Log.i(TAG, "Emergency map empty. Ward $ward")
+                    _emergencyMap.value = EmergencyMapUi.Empty
+                    return@launch
+                }
+                val fetchedAt = System.currentTimeMillis()
+                MuniPulseDatabase.get(getApplication()).cachedMapPoints().replaceWard(
+                    ward,
+                    points.map { point ->
+                        CachedMapPoint(
+                            id = point.id,
+                            wardCode = ward,
+                            kind = point.kind,
+                            name = point.name,
+                            latitude = point.latitude,
+                            longitude = point.longitude,
+                            fetchedAt = fetchedAt,
+                        )
+                    },
+                )
+                Log.i(TAG, "Emergency map loaded. Ward $ward. Points ${points.size}")
+                _emergencyMap.value = EmergencyMapUi.Ready(points, fetchedAt, fromCache = false)
+            } catch (error: Exception) {
+                if (generation != emergencyGeneration) {
+                    return@launch
+                }
+                val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
+                Log.e(TAG, "Emergency map failed: $reason")
+                _emergencyMap.value = EmergencyMapUi.Failed(
+                    getApplication<Application>().getString(R.string.map_failed),
+                    cacheAvailable = cached.isNotEmpty(),
+                )
+            }
+        }
+    }
+
+    fun showCachedEmergencyMap(wardCode: String) {
+        val generation = ++emergencyGeneration
+        val ward = WardCatalog.normalize(wardCode)
+        viewModelScope.launch {
+            val cached = cachedEmergency(ward)
+            if (generation != emergencyGeneration) {
+                return@launch
+            }
+            if (cached.isEmpty()) {
+                _emergencyMap.value = EmergencyMapUi.Empty
+                return@launch
+            }
+            val fetchedAt = cached.maxOf { it.fetchedAt }
+            Log.i(TAG, "Emergency map opened from cache. Ward $ward. Points ${cached.size}")
+            _emergencyMap.value = EmergencyMapUi.Ready(
+                points = cached.map { row ->
+                    EmergencyPointItem(
+                        id = row.id,
+                        kind = row.kind,
+                        name = row.name,
+                        latitude = row.latitude,
+                        longitude = row.longitude,
+                    )
+                },
+                fetchedAt = fetchedAt,
+                fromCache = true,
+            )
+        }
+    }
+
+    private suspend fun cachedEmergency(wardCode: String): List<CachedMapPoint> =
+        MuniPulseDatabase.get(getApplication()).cachedMapPoints().list(wardCode)
 
     fun clearIncident() {
         detailGeneration++

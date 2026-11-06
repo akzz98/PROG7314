@@ -47,7 +47,7 @@ flowchart TB
 
 Part 2 includes Google SSO, Settings, the custom API and database, and custom features UD-1 (photo + GPS), UD-2 (upvotes and ward aggregation), and UD-3 (resolution timeline).
 
-Final POE still to come: ticket and ward pushes, the emergency map (UD-4), and impact scores (UD-5). English, isiZulu, biometric unlock, Azure Blob photos, the Room queue, and FCM token registration are in this build. With no network, a valid report is stored on the phone and the form says it is queued.
+Final POE still to come: impact scores (UD-5). English, isiZulu, biometric unlock, Azure Blob photos, the Room queue, FCM ticket and ward alerts, and the emergency map (UD-4) are in this build. The map draws seeded water and evacuation points on the phone. It does not use a map-provider key. With no network, **Navigate cached** opens the last points saved for that ward. A valid report with no network is stored on the phone and the form says it is queued.
 
 ## Layout
 
@@ -154,7 +154,7 @@ Requires the .NET 10 SDK.
 dotnet run --project api/MuniPulse.Api --launch-profile http
 ```
 
-`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, SAS request validation, the sync push contract, the 250 metre duplicate window, push preference and copy rules, the field-worker demo key comparison, and unauthenticated calls (including area alerts). They do not need Firebase, MongoDB, Azure, or a JWT signing key. The API workflow runs the same command on every push.
+`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, SAS request validation, the sync push contract, the 250 metre duplicate window, push preference and copy rules, the emergency-point seed for each demo ward, the field-worker demo key comparison, and unauthenticated calls (including area alerts and emergency points). They do not need Firebase, MongoDB, Azure, a map key, or a JWT signing key. The API workflow runs the same command on every push.
 
 Health check: [http://localhost:5285/health](http://localhost:5285/health)
 
@@ -176,6 +176,7 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 | POST | `/api/v1/sync/push` | Bearer API JWT. A batch of 1 to 20 queued `createIncident` operations. Each result is `ack` or `conflict`. Photos are uploaded with the media link first. |
 | POST, DELETE | `/api/v1/devices/fcm-token` | Bearer API JWT. POST body is `token` and `platform` (`android`). Stores the device push token. DELETE removes that user's tokens. Sign-out calls DELETE. |
 | POST, GET | `/api/v1/incidents` and `/api/v1/incidents/{id}` | Bearer API JWT. Detail photos include a short-lived read URL when the blob is recorded. |
+| GET | `/api/v1/emergency/points` | Bearer API JWT. Query `wardCode`. Returns seeded water and evacuation points for that demo ward. |
 | GET | `/api/v1/incidents/aggregates` | Bearer API JWT. Open reports in the ward, grouped when they share an `aggregateId`. |
 | GET | `/api/v1/incidents/nearby` | Bearer API JWT. Open reports in the same ward and category within 250 metres and 14 days. |
 | POST | `/api/v1/incidents/{id}/upvotes` | Bearer API JWT. One vote per user. |

@@ -23,6 +23,7 @@ public static class ApiEndpoints
         api.MapPost("/sync/push", PushSync).RequireAuthorization().RequireRateLimiting("writes");
         api.MapPost("/devices/fcm-token", RegisterFcmToken).RequireAuthorization().RequireRateLimiting("writes");
         api.MapDelete("/devices/fcm-token", ClearFcmToken).RequireAuthorization().RequireRateLimiting("writes");
+        api.MapGet("/emergency/points", ListEmergencyPoints).RequireAuthorization();
         api.MapGet("/incidents/aggregates", ListAggregates).RequireAuthorization();
         api.MapGet("/incidents/nearby", ListNearby).RequireAuthorization();
         api.MapGet("/incidents/{id}", GetIncident).RequireAuthorization();
@@ -819,6 +820,41 @@ public static class ApiEndpoints
     private static AggregateSummary ToAggregate(WardAggregate group) =>
         new(group.AggregateId, group.Category, group.WardCode, group.ReportCount, group.UpvoteCount, group.IncidentId);
 
+    private static async Task<IResult> ListEmergencyPoints(
+        string? wardCode,
+        HttpContext http,
+        IncidentStore store,
+        ILogger<IncidentStore> logger,
+        CancellationToken cancellationToken)
+    {
+        var user = await RequireUserAsync(http, store, cancellationToken);
+        if (user is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Sign in is required.");
+        }
+
+        var code = wardCode?.Trim() ?? "";
+        if (!WardCatalog.IsKnown(code))
+        {
+            return ApiErrors.Result(
+                http,
+                StatusCodes.Status400BadRequest,
+                "VALIDATION_ERROR",
+                "One or more fields are invalid.",
+                new Dictionary<string, string> { ["wardCode"] = "Choose a demo ward such as JHB-23." });
+        }
+
+        var points = await store.ListEmergencyPointsAsync(code, cancellationToken);
+        logger.LogInformation("Emergency points loaded for ward {WardCode}. Count {PointCount}", code, points.Count);
+        return Results.Ok(new EmergencyPointsResponse(points.Select(point => new EmergencyPointResponse(
+            point.Id,
+            point.WardCode,
+            point.Kind,
+            point.Name,
+            point.Latitude,
+            point.Longitude)).ToArray()));
+    }
+
     private static async Task<IResult> GetIncident(
         string id,
         HttpContext http,
@@ -1454,6 +1490,16 @@ public sealed record CreateIncidentResponse(
     DateTime CreatedAt);
 
 public sealed record UpvoteResponse(int UpvoteCount, string? AggregateId);
+
+public sealed record EmergencyPointsResponse(EmergencyPointResponse[] Items);
+
+public sealed record EmergencyPointResponse(
+    string Id,
+    string WardCode,
+    string Kind,
+    string Name,
+    double Latitude,
+    double Longitude);
 
 public sealed record NearbyListResponse(NearbyDuplicateResponse[] Items);
 

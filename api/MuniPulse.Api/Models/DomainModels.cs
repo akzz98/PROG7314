@@ -136,6 +136,22 @@ public sealed class WardDocument
     public string Name { get; set; } = "";
 }
 
+public sealed class EmergencyPoint
+{
+    [BsonId]
+    public string Id { get; set; } = "";
+
+    public string WardCode { get; set; } = "";
+
+    public string Kind { get; set; } = "";
+
+    public string Name { get; set; } = "";
+
+    public double Latitude { get; set; }
+
+    public double Longitude { get; set; }
+}
+
 public static class IncidentCategories
 {
     public const string Pothole = "Pothole";

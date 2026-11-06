@@ -52,10 +52,13 @@ import za.co.munipulse.ui.common.ListError
 import za.co.munipulse.ui.common.ListLoading
 import za.co.munipulse.ui.incidents.MyIncidentsPane
 import za.co.munipulse.ui.incidents.MyIncidentsUi
+import za.co.munipulse.ui.map.EmergencyMapScreen
+import za.co.munipulse.ui.map.EmergencyMapUi
 
 enum class HomeTab {
     Pulse,
     Mine,
+    Map,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,6 +77,9 @@ fun HomeScreen(
     onOpenIncident: (String) -> Unit,
     onOpenHotspots: () -> Unit,
     onOpenReport: () -> Unit,
+    emergencyMap: EmergencyMapUi,
+    onRefreshMap: () -> Unit,
+    onNavigateCached: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -113,23 +119,16 @@ fun HomeScreen(
                     icon = { Icon(Icons.Filled.Person, contentDescription = null) },
                     label = { Text(text = stringResource(R.string.nav_my)) },
                 )
-                // FINAL POE — the emergency map is not part of this prototype.
                 NavigationBarItem(
-                    selected = false,
-                    onClick = {},
-                    enabled = false,
+                    selected = tab == HomeTab.Map,
+                    onClick = { onTab(HomeTab.Map) },
                     icon = {
                         Icon(
                             Icons.Filled.Place,
                             contentDescription = stringResource(R.string.nav_map_description),
                         )
                     },
-                    label = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = stringResource(R.string.nav_map))
-                            Text(text = stringResource(R.string.nav_map_poe))
-                        }
-                    },
+                    label = { Text(text = stringResource(R.string.nav_map)) },
                 )
                 NavigationBarItem(
                     selected = false,
@@ -140,8 +139,8 @@ fun HomeScreen(
             }
         },
     ) { padding ->
-        if (tab == HomeTab.Mine) {
-            MyIncidentsPane(
+        when (tab) {
+            HomeTab.Mine -> MyIncidentsPane(
                 padding = padding,
                 mine = mine,
                 status = mineStatus,
@@ -150,8 +149,14 @@ fun HomeScreen(
                 onOpenIncident = onOpenIncident,
                 onOpenReport = onOpenReport,
             )
-        } else {
-            PulseBody(
+            HomeTab.Map -> EmergencyMapScreen(
+                padding = padding,
+                wardLabel = ward?.name ?: wardCode,
+                map = emergencyMap,
+                onRefresh = onRefreshMap,
+                onNavigateCached = onNavigateCached,
+            )
+            HomeTab.Pulse -> PulseBody(
                 padding = padding,
                 wardLabel = ward?.name ?: wardCode,
                 wardMenu = wardMenu,

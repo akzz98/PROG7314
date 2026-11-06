@@ -8,6 +8,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Dao
 interface PendingSyncDao {
@@ -28,14 +30,16 @@ interface LocalSettingsDao {
 }
 
 @Database(
-    entities = [PendingSyncOperation::class, LocalSettings::class],
-    version = 1,
+    entities = [PendingSyncOperation::class, LocalSettings::class, CachedMapPoint::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class MuniPulseDatabase : RoomDatabase() {
     abstract fun pendingSync(): PendingSyncDao
 
     abstract fun localSettings(): LocalSettingsDao
+
+    abstract fun cachedMapPoints(): CachedMapPointDao
 
     companion object {
         @Volatile
@@ -47,12 +51,30 @@ abstract class MuniPulseDatabase : RoomDatabase() {
                 return current
             }
             return synchronized(this) {
-                instance ?: Room.databaseBuilder(
+                instance ?:                 Room.databaseBuilder(
                     context.applicationContext,
                     MuniPulseDatabase::class.java,
                     "munipulse.db",
-                ).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
             }
         }
+    }
+}
+
+private val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS cached_map_points (
+                id TEXT NOT NULL PRIMARY KEY,
+                wardCode TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                name TEXT NOT NULL,
+                latitude REAL NOT NULL,
+                longitude REAL NOT NULL,
+                fetchedAt INTEGER NOT NULL
+            )
+            """.trimIndent(),
+        )
     }
 }
