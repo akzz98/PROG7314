@@ -5,11 +5,18 @@ using MuniPulse.Api.Endpoints;
 using MuniPulse.Api.Errors;
 using MuniPulse.Api.Push;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.AspNetCore.HttpOverrides;
 
 LogSafety.DisableTokenLogging();
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddOpenApi();
 builder.Services.Configure<JsonOptions>(options =>
 {
@@ -117,6 +124,7 @@ if (app.Environment.IsDevelopment())
 
 if (!app.Environment.IsEnvironment("Testing"))
 {
+    app.UseForwardedHeaders();
     app.UseHttpsRedirection();
 }
 app.UseAuthentication();

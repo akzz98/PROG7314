@@ -3,6 +3,7 @@ package za.co.munipulse.ui.map
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -118,7 +119,31 @@ fun EmergencyMapScreen(
 
 @Composable
 private fun MapReady(map: EmergencyMapUi.Ready) {
-    PointSketch(points = map.points, modifier = Modifier.fillMaxWidth().height(220.dp))
+    Text(text = stringResource(R.string.map_how), style = MaterialTheme.typography.bodyLarge)
+    Spacer(modifier = Modifier.height(12.dp))
+    Box(modifier = Modifier.fillMaxWidth()) {
+        PointSketch(points = map.points, modifier = Modifier.fillMaxWidth().height(220.dp))
+        Text(
+            text = stringResource(R.string.map_north),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp),
+        )
+    }
+    Spacer(modifier = Modifier.height(12.dp))
+    map.points.forEach { point ->
+        val line = if (point.kind == POINT_EVACUATION) {
+            stringResource(R.string.map_dot_evacuation, point.name)
+        } else {
+            stringResource(R.string.map_dot_water, point.name)
+        }
+        Text(
+            text = line,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier
+                .padding(vertical = 4.dp)
+                .semantics { contentDescription = line },
+        )
+    }
     Spacer(modifier = Modifier.height(8.dp))
     val saved = cacheClock(map.fetchedAt)
     Text(
@@ -128,19 +153,8 @@ private fun MapReady(map: EmergencyMapUi.Ready) {
             stringResource(R.string.map_live, saved)
         },
         style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Spacer(modifier = Modifier.height(12.dp))
-    map.points.forEach { point ->
-        val kind = kindLabel(point.kind)
-        val line = stringResource(R.string.map_point, kind, point.name)
-        Text(
-            text = line,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier
-                .padding(vertical = 4.dp)
-                .semantics { contentDescription = line },
-        )
-    }
 }
 
 @Composable
@@ -190,7 +204,7 @@ private fun PointSketch(points: List<EmergencyPointItem>, modifier: Modifier = M
             val x = pad + ((point.longitude - minLng) / lngSpan).toFloat() * (size.width - pad * 2)
             val y = pad + ((maxLat - point.latitude) / latSpan).toFloat() * (size.height - pad * 2)
             val color = if (point.kind == POINT_EVACUATION) evacuation else water
-            drawCircle(color = color, radius = 10.dp.toPx(), center = Offset(x, y))
+            drawCircle(color = color, radius = 14.dp.toPx(), center = Offset(x, y))
         }
     }
     if (points.any { it.kind == POINT_WATER } && points.any { it.kind == POINT_EVACUATION }) {
@@ -213,12 +227,6 @@ private fun LegendDot(color: Color, label: String) {
         }
         Text(text = label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 6.dp))
     }
-}
-
-@Composable
-private fun kindLabel(kind: String): String = when (kind) {
-    POINT_EVACUATION -> stringResource(R.string.map_kind_evacuation)
-    else -> stringResource(R.string.map_kind_water)
 }
 
 private fun cacheClock(epochMillis: Long): String {
