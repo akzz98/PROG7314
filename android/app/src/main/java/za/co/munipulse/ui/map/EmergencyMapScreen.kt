@@ -1,8 +1,14 @@
 package za.co.munipulse.ui.map
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextAlign
+import kotlin.math.cos
+import kotlin.math.sqrt
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -23,7 +30,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -120,15 +126,13 @@ fun EmergencyMapScreen(
 @Composable
 private fun MapReady(map: EmergencyMapUi.Ready) {
     Text(text = stringResource(R.string.map_how), style = MaterialTheme.typography.bodyLarge)
-    Spacer(modifier = Modifier.height(12.dp))
-    Box(modifier = Modifier.fillMaxWidth()) {
-        PointSketch(points = map.points, modifier = Modifier.fillMaxWidth().height(220.dp))
-        Text(
-            text = stringResource(R.string.map_north),
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp),
-        )
+    val apart = apartKm(map.points)
+    if (apart != null) {
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(text = stringResource(R.string.map_apart, apart), style = MaterialTheme.typography.bodyLarge)
     }
+    Spacer(modifier = Modifier.height(12.dp))
+    PointSketch(points = map.points, modifier = Modifier.fillMaxWidth().height(280.dp))
     Spacer(modifier = Modifier.height(12.dp))
     map.points.forEach { point ->
         val line = if (point.kind == POINT_EVACUATION) {
@@ -185,49 +189,121 @@ private fun PointSketch(points: List<EmergencyPointItem>, modifier: Modifier = M
     val water = PulseTeal
     val evacuation = MaterialTheme.colorScheme.onSurface
     val canvasDescription = stringResource(R.string.map_canvas_description)
-    Canvas(
+    val north = stringResource(R.string.map_north)
+    val scaleLabel = stringResource(R.string.map_scale)
+    val shape = RoundedCornerShape(16.dp)
+    val plots = plot(points)
+    BoxWithConstraints(
         modifier = modifier
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.surface, shape)
+            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
             .semantics { contentDescription = canvasDescription },
     ) {
-        if (points.isEmpty()) {
-            return@Canvas
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val span = plotSpanMetres(points).toFloat().coerceAtLeast(1f)
+            val bar = (1000f / span).coerceIn(0.12f, 0.42f) * size.width
+            val left = 16.dp.toPx()
+            val bottom = size.height - 18.dp.toPx()
+            drawLine(
+                color = evacuation,
+                start = Offset(left, bottom),
+                end = Offset(left + bar, bottom),
+                strokeWidth = 3.dp.toPx(),
+            )
         }
-        val minLat = points.minOf { it.latitude }
-        val maxLat = points.maxOf { it.latitude }
-        val minLng = points.minOf { it.longitude }
-        val maxLng = points.maxOf { it.longitude }
-        val latSpan = (maxLat - minLat).takeIf { it > 0.0001 } ?: 0.02
-        val lngSpan = (maxLng - minLng).takeIf { it > 0.0001 } ?: 0.02
-        val pad = 28.dp.toPx()
-        points.forEach { point ->
-            val x = pad + ((point.longitude - minLng) / lngSpan).toFloat() * (size.width - pad * 2)
-            val y = pad + ((maxLat - point.latitude) / latSpan).toFloat() * (size.height - pad * 2)
-            val color = if (point.kind == POINT_EVACUATION) evacuation else water
-            drawCircle(color = color, radius = 14.dp.toPx(), center = Offset(x, y))
-        }
-    }
-    if (points.any { it.kind == POINT_WATER } && points.any { it.kind == POINT_EVACUATION }) {
-        Row(
-            modifier = Modifier.padding(top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            LegendDot(color = water, label = stringResource(R.string.map_kind_water))
-            LegendDot(color = evacuation, label = stringResource(R.string.map_kind_evacuation))
+        Text(
+            text = "↑ $north",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+        )
+        Text(
+            text = scaleLabel,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 22.dp),
+        )
+        plots.forEach { placed ->
+            val label = if (placed.point.kind == POINT_EVACUATION) {
+                stringResource(R.string.map_kind_evacuation)
+            } else {
+                stringResource(R.string.map_kind_water)
+            }
+            val color = if (placed.point.kind == POINT_EVACUATION) evacuation else water
+            Column(
+                modifier = Modifier
+                    .offset(x = maxWidth * placed.x - 56.dp, y = maxHeight * placed.y - 10.dp)
+                    .width(112.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Canvas(modifier = Modifier.size(18.dp)) {
+                    drawCircle(color = color)
+                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
 
-@Composable
-private fun LegendDot(color: Color, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Canvas(modifier = Modifier.size(12.dp)) {
-            drawCircle(color = color)
-        }
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 6.dp))
+private data class PlacedPoint(val point: EmergencyPointItem, val x: Float, val y: Float)
+
+private fun plot(points: List<EmergencyPointItem>): List<PlacedPoint> {
+    if (points.isEmpty()) {
+        return emptyList()
+    }
+    val midLat = points.map { it.latitude }.average()
+    val midLng = points.map { it.longitude }.average()
+    val span = plotSpanMetres(points)
+    return points.map { point ->
+        val east = eastMetres(point.longitude, midLng, midLat)
+        val north = northMetres(point.latitude, midLat)
+        PlacedPoint(
+            point = point,
+            x = (0.5 + east / span).toFloat().coerceIn(0.22f, 0.78f),
+            y = (0.5 - north / span).toFloat().coerceIn(0.24f, 0.72f),
+        )
     }
 }
+
+private fun plotSpanMetres(points: List<EmergencyPointItem>): Double {
+    if (points.isEmpty()) {
+        return 2_000.0
+    }
+    val midLat = points.map { it.latitude }.average()
+    val midLng = points.map { it.longitude }.average()
+    val farthest = points.maxOf { point ->
+        val east = eastMetres(point.longitude, midLng, midLat)
+        val north = northMetres(point.latitude, midLat)
+        sqrt(east * east + north * north)
+    }
+    return farthest.coerceAtLeast(700.0) * 2.8
+}
+
+private fun apartKm(points: List<EmergencyPointItem>): Double? {
+    if (points.size < 2) {
+        return null
+    }
+    var farthest = 0.0
+    for (left in points.indices) {
+        for (right in left + 1 until points.size) {
+            val east = eastMetres(points[left].longitude, points[right].longitude, points[left].latitude)
+            val north = northMetres(points[left].latitude, points[right].latitude)
+            val km = sqrt(east * east + north * north) / 1000.0
+            if (km > farthest) {
+                farthest = km
+            }
+        }
+    }
+    return farthest
+}
+
+private fun northMetres(latitude: Double, originLatitude: Double): Double =
+    (latitude - originLatitude) * 110_540.0
+
+private fun eastMetres(longitude: Double, originLongitude: Double, latitude: Double): Double =
+    (longitude - originLongitude) * 111_320.0 * cos(Math.toRadians(latitude)).coerceAtLeast(0.2)
 
 private fun cacheClock(epochMillis: Long): String {
     val zone = ZoneId.systemDefault()

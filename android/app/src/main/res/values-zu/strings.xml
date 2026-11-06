@@ -67,10 +67,12 @@
     <string name="detail_map_coords">%1$.5f, %2$.5f</string>
     <string name="map_title">Izindawo eziphuthumayo · %1$s</string>
     <string name="map_disclaimer">Lezi zindawo azisetshenziselwa u-112 noma ukuthumela okubukhoma.</string>
-    <string name="map_how">Amachashazi asebhakisini yizindawo zaleli wadi. Inhla isenhla. Amagama abhalwe ngaphansi kwebhokisi.</string>
+    <string name="map_how">Okuluhlaza okotshani kungamanzi. Okumnyama yindawo yokuphepha uma kufanele uhambe. Inhla isenhla ebhokisini.</string>
     <string name="map_north">Inhla</string>
-    <string name="map_dot_water">Ichashazi eliluhlaza okotshani · %1$s</string>
-    <string name="map_dot_evacuation">Ichashazi elimnyama · %1$s</string>
+    <string name="map_dot_water">Amanzi · %1$s</string>
+    <string name="map_dot_evacuation">Ukuphepha · %1$s</string>
+    <string name="map_apart">Lezi zindawo zihlukaniswe cishe ngo-%1$.1f km kule wadi.</string>
+    <string name="map_scale">1 km</string>
     <string name="map_cached_at">Kulondolozwe kule foni: %1$s</string>
     <string name="map_live">Kulandwe ku-MuniPulse · %1$s</string>
     <string name="map_navigate_cached">Vula okulondoloziwe</string>

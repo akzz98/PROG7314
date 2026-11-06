@@ -67,10 +67,12 @@
     <string name="detail_map_coords">%1$.5f, %2$.5f</string>
     <string name="map_title">Emergency points · %1$s</string>
     <string name="map_disclaimer">These points are not for 112 or live dispatch.</string>
-    <string name="map_how">The dots in the box are places in this ward. North is at the top. The names are listed under the box.</string>
+    <string name="map_how">Green is a water point. Black is where to go if you must leave. North is at the top of the box.</string>
     <string name="map_north">North</string>
-    <string name="map_dot_water">Green dot · %1$s</string>
-    <string name="map_dot_evacuation">Black dot · %1$s</string>
+    <string name="map_dot_water">Water · %1$s</string>
+    <string name="map_dot_evacuation">Evacuation · %1$s</string>
+    <string name="map_apart">These places are about %1$.1f km apart in this ward.</string>
+    <string name="map_scale">1 km</string>
     <string name="map_cached_at">Saved on this phone: %1$s</string>
     <string name="map_live">Loaded from MuniPulse · %1$s</string>
     <string name="map_navigate_cached">Navigate cached</string>
