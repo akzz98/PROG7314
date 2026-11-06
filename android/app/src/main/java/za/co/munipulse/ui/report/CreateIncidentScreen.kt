@@ -30,6 +30,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -89,6 +90,7 @@ fun CreateIncidentScreen(
     var submitFailed by remember { mutableStateOf(false) }
     var successTitle by remember { mutableStateOf<String?>(null) }
     var successBody by remember { mutableStateOf<String?>(null) }
+    var successHold by remember { mutableLongStateOf(1800L) }
     val mutationId = remember { java.util.UUID.randomUUID().toString() }
     var fieldErrors by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var access by remember { mutableStateOf(MediaPermissions.current(context)) }
@@ -220,7 +222,7 @@ fun CreateIncidentScreen(
     if (shownTitle != null && shownBody != null) {
         BackHandler(onBack = finish)
         LaunchedEffect(shownTitle) {
-            delay(1800)
+            delay(successHold)
             finish()
         }
         Box(
@@ -480,6 +482,7 @@ fun CreateIncidentScreen(
                         IncidentSubmitResult.Queued -> {
                             formAccepted = true
                             submitFailed = false
+                            successHold = 3200L
                             successTitle = context.getString(R.string.report_success_queued)
                             successBody = context.getString(R.string.report_queued)
                         }

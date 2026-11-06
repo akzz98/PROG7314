@@ -124,11 +124,11 @@
     <string name="report_valid">Ifomu ilungile. Lo mbiko awukathunyelwa.</string>
     <string name="report_sending">Kuthunyelwa umbiko…</string>
     <string name="report_saved">Umbiko ulondoloziwe. %1$s</string>
-    <string name="report_queued">Kulindwe kule foni. Kuzothunyelwa uma usuxhumekile.</string>
+    <string name="report_queued">Lo mbiko ulondoloziwe kule foni. Vumelanisa esikhungweni sokuvumelanisa uma usubuyele kunethiwekhi.</string>
     <string name="report_duplicate">Lo mbiko usuvele wathunyelwa.</string>
     <string name="report_success_sent">Umbiko uthunyelwe</string>
     <string name="report_success_sent_body">Umbiko wakho uthunyelwe.</string>
-    <string name="report_success_queued">Kulondoloziwe kule foni</string>
+    <string name="report_success_queued">Awuxhunyiwe ku-inthanethi</string>
     <string name="report_success_duplicate">Sekuthunyelwe</string>
     <string name="report_send_failed">Umbiko awuthunyelwanga. Zama futhi.</string>
     <string name="report_photo_failed">Isithombe asilungiselelwanga.</string>

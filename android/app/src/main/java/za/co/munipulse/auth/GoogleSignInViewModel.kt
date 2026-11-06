@@ -28,6 +28,7 @@ import za.co.munipulse.data.QueuedIncident
 import za.co.munipulse.data.QueuedPhotos
 import za.co.munipulse.data.SyncAttempt
 import za.co.munipulse.data.SyncStatus
+import za.co.munipulse.data.TransportFailure
 import za.co.munipulse.report.IncidentDraft
 import za.co.munipulse.report.IncidentSubmitResult
 import za.co.munipulse.report.IncidentValidator
@@ -1270,6 +1271,10 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 }
             }
         } catch (error: Exception) {
+            if (TransportFailure.isOffline(error)) {
+                Log.i(TAG, "Incident create had no network: ${error.javaClass.simpleName}")
+                return queueOffline(draft, photos, mutationId)
+            }
             val reason = if (error is IncidentRequestException) error.code else error.javaClass.simpleName
             Log.e(TAG, "Incident create failed: $reason")
             val message = when (reason) {
