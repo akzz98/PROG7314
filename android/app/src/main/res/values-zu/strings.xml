@@ -12,6 +12,7 @@
     <string name="login_failed">Ukungena nge-Google akuqediwe. Zama futhi.</string>
     <string name="home_title">Ikhaya</string>
     <string name="home_report">Bika</string>
+    <string name="home_report_description">Bika isigameko</string>
     <string name="home_settings">Izilungiselelo</string>
     <string name="nav_home">Ikhaya</string>
     <string name="nav_my">Okwami</string>
@@ -68,6 +69,8 @@
     <string name="map_cached_at">Kulondolozwe kule foni: %1$s</string>
     <string name="map_live">Kulandwe ku-MuniPulse · %1$s</string>
     <string name="map_navigate_cached">Zulazula okulondoloziwe</string>
+    <string name="map_navigate_cached_description">Vula izindawo eziphuthumayo ezilondolozwe kule foni</string>
+    <string name="map_canvas_description">Imephu yezindawo zamanzi nezokuphuma</string>
     <string name="map_empty">Azikho izindawo zamanzi noma zokuphuma kulawa wadi.</string>
     <string name="map_empty_body">Zama elinye iwadi, noma zama futhi uma usuxhumekile.</string>
     <string name="map_failed">Izindawo eziphuthumayo azilandwanga.</string>
@@ -106,6 +109,7 @@
     <string name="report_photo_remove">Susa</string>
     <string name="report_photo_limit">Ungangeza izithombe ezifika kwezintathu.</string>
     <string name="report_submit">Thumela umbiko</string>
+    <string name="report_submit_description">Thumela lo mbiko</string>
     <string name="nearby_checking">Kuhlolwa imibiko eseduze…</string>
     <string name="nearby_title">Okuphindaphindiwe okuseduze (%1$d)</string>
     <string name="nearby_none">Ayikho imibiko evulekile esondele kangaka.</string>
@@ -187,7 +191,6 @@
     <string name="push_channel_name">Izexwayiso ze-MuniPulse</string>
     <string name="push_fallback_title">I-MuniPulse SA</string>
     <string name="push_fallback_body">Kukhona isibuyekezo esisha.</string>
-    <string name="settings_final_poe">Kuza ku-POE yokugcina</string>
     <string name="profile_title">Iphrofayela</string>
     <string name="profile_name">Igama</string>
     <string name="profile_email">I-imeyili</string>

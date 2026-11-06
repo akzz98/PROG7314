@@ -24,10 +24,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import za.co.munipulse.R
+import za.co.munipulse.ui.theme.PulseTeal
 import za.co.munipulse.ui.common.ListEmpty
 import za.co.munipulse.ui.common.ListError
 import za.co.munipulse.ui.common.ListLoading
@@ -89,7 +93,14 @@ fun EmergencyMapScreen(
                 ListError(message = map.message, onRetry = onRefresh)
                 if (map.cacheAvailable) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = onNavigateCached) {
+                    val cachedDescription = stringResource(R.string.map_navigate_cached_description)
+                    Button(
+                        onClick = onNavigateCached,
+                        modifier = Modifier.clearAndSetSemantics {
+                            contentDescription = cachedDescription
+                            role = Role.Button
+                        },
+                    ) {
                         Text(text = stringResource(R.string.map_navigate_cached))
                     }
                 }
@@ -157,10 +168,13 @@ fun LocationSnippet(latitude: Double, longitude: Double, modifier: Modifier = Mo
 
 @Composable
 private fun PointSketch(points: List<EmergencyPointItem>, modifier: Modifier = Modifier) {
-    val water = Color(0xFF0B6E4F)
-    val evacuation = Color(0xFF8C4A2F)
+    val water = PulseTeal
+    val evacuation = MaterialTheme.colorScheme.onSurface
+    val canvasDescription = stringResource(R.string.map_canvas_description)
     Canvas(
-        modifier = modifier.background(MaterialTheme.colorScheme.surface),
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surface)
+            .semantics { contentDescription = canvasDescription },
     ) {
         if (points.isEmpty()) {
             return@Canvas

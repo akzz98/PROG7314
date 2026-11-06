@@ -38,6 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -353,6 +357,7 @@ fun CreateIncidentScreen(
         FieldMessage(fieldErrors["wardCode"])
         Spacer(modifier = Modifier.height(8.dp))
         NearbyDuplicates(nearby, nearbyOpen, onToggle = { nearbyOpen = !nearbyOpen })
+        val submitDescription = stringResource(R.string.report_submit_description)
         Button(
             onClick = {
                 if (submitting) {
@@ -411,7 +416,12 @@ fun CreateIncidentScreen(
                 }
             },
             enabled = !submitting,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clearAndSetSemantics {
+                    contentDescription = submitDescription
+                    role = Role.Button
+                },
         ) {
             Text(text = stringResource(if (submitting) R.string.report_sending else R.string.report_submit))
         }

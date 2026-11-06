@@ -43,6 +43,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.unit.dp
 import za.co.munipulse.R
 import za.co.munipulse.auth.WardCatalog
@@ -99,8 +103,13 @@ fun HomeScreen(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
+            val reportDescription = stringResource(R.string.home_report_description)
             ExtendedFloatingActionButton(
                 onClick = onOpenReport,
+                modifier = Modifier.clearAndSetSemantics {
+                    contentDescription = reportDescription
+                    role = Role.Button
+                },
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                 text = { Text(text = stringResource(R.string.home_report)) },
             )
@@ -125,7 +134,7 @@ fun HomeScreen(
                     icon = {
                         Icon(
                             Icons.Filled.Place,
-                            contentDescription = stringResource(R.string.nav_map_description),
+                            contentDescription = null,
                         )
                     },
                     label = { Text(text = stringResource(R.string.nav_map)) },

@@ -12,6 +12,7 @@
     <string name="login_failed">Google sign-in did not finish. Try again.</string>
     <string name="home_title">Home</string>
     <string name="home_report">Report</string>
+    <string name="home_report_description">Report an incident</string>
     <string name="home_settings">Settings</string>
     <string name="nav_home">Home</string>
     <string name="nav_my">My</string>
@@ -68,6 +69,8 @@
     <string name="map_cached_at">Saved on this phone: %1$s</string>
     <string name="map_live">Loaded from MuniPulse · %1$s</string>
     <string name="map_navigate_cached">Navigate cached</string>
+    <string name="map_navigate_cached_description">Open the emergency points saved on this phone</string>
+    <string name="map_canvas_description">Map of water and evacuation points</string>
     <string name="map_empty">No water or evacuation points for this ward.</string>
     <string name="map_empty_body">Try another ward, or retry when you are online.</string>
     <string name="map_failed">The emergency points did not load.</string>
@@ -106,6 +109,7 @@
     <string name="report_photo_remove">Remove</string>
     <string name="report_photo_limit">You can add up to 3 photos.</string>
     <string name="report_submit">Submit report</string>
+    <string name="report_submit_description">Send this report</string>
     <string name="nearby_checking">Checking nearby reports…</string>
     <string name="nearby_title">Nearby duplicates (%1$d)</string>
     <string name="nearby_none">No open reports are this close.</string>
@@ -187,7 +191,6 @@
     <string name="push_channel_name">MuniPulse alerts</string>
     <string name="push_fallback_title">MuniPulse SA</string>
     <string name="push_fallback_body">There is a new update.</string>
-    <string name="settings_final_poe">Coming in Final POE</string>
     <string name="profile_title">Profile</string>
     <string name="profile_name">Name</string>
     <string name="profile_email">Email</string>

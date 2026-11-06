@@ -9,7 +9,7 @@ data class NotificationPreferences(
     val marketingNews: Boolean = false,
 )
 
-// S11 choices on this device. Push delivery is Final POE and is not started here.
+// S11 choices on this device. Marketing stays here and is not sent to the API.
 class NotificationStore(context: Context) {
     private val preferences = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
 
