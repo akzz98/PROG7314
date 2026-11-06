@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -122,11 +123,26 @@ fun CreateIncidentScreen(
             MediaPermissions.current(context)
         }
         asked = true
-        if (pendingTake && access.camera) {
-            pendingTake = false
-            launchCamera(context, onUri = { pendingCapture = it }, onLaunch = takePhoto::launch)
-        } else {
-            pendingTake = false
+        if (access.camera) {
+            if (pendingTake) {
+                pendingTake = false
+                launchCamera(context, onUri = { pendingCapture = it }, onLaunch = takePhoto::launch)
+            }
+            return@rememberLauncherForActivityResult
+        }
+        val takeAfterGrant = pendingTake
+        scope.launch {
+            delay(400)
+            val again = MediaPermissions.current(context)
+            if (!again.camera) {
+                pendingTake = false
+                return@launch
+            }
+            access = again
+            if (takeAfterGrant) {
+                pendingTake = false
+                launchCamera(context, onUri = { pendingCapture = it }, onLaunch = takePhoto::launch)
+            }
         }
     }
 
@@ -155,9 +171,27 @@ fun CreateIncidentScreen(
             false
         }
         if (!granted) {
-            locationDenied = true
+            scope.launch {
+                delay(400)
+                if (!LocationCapture.isGranted(context)) {
+                    locationDenied = true
+                    return@launch
+                }
+                locationDenied = false
+                readingLocation = true
+                applyFix(
+                    context,
+                    onFix = {
+                        fix = it
+                        locationMissing = false
+                    },
+                    onMissing = { locationMissing = true },
+                    onDone = { readingLocation = false },
+                )
+            }
             return@rememberLauncherForActivityResult
         }
+        locationDenied = false
         readingLocation = true
         scope.launch {
             applyFix(
@@ -231,7 +265,7 @@ fun CreateIncidentScreen(
                     if (!MediaPermissions.current(context).camera) {
                         pendingTake = true
                         try {
-                            mediaLauncher.launch(MediaPermissions.request())
+                            mediaLauncher.launch(arrayOf(MediaPermissions.camera()))
                         } catch (error: Exception) {
                             pendingTake = false
                             asked = true
