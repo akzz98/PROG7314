@@ -879,7 +879,7 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                     return@launch
                 }
                 if (pending.isEmpty()) {
-                    publishSyncCentre(note = syncNote(online = true), busy = false)
+                    publishSyncCentre(note = getApplication<Application>().getString(R.string.sync_empty), busy = false)
                     return@launch
                 }
                 pushRows(pending)
@@ -986,7 +986,13 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         try {
             val database = MuniPulseDatabase.get(getApplication())
             val settings = database.localSettings().read()
-            val items = database.pendingSync().list()
+            val rows = database.pendingSync().list()
+            for (row in rows) {
+                if (row.status == SyncStatus.ACK) {
+                    database.pendingSync().delete(row.id)
+                }
+            }
+            val items = rows
                 .filter { it.status != SyncStatus.ACK }
                 .map { row ->
                 QueuedReportRow(
