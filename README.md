@@ -101,6 +101,16 @@ dotnet user-secrets set "Jwt:SigningKey" "<at-least-32-random-characters>" --pro
 
 `Firebase:ProjectId` in `appsettings.json` is `munipulse-987ce`. It must match the Firebase project that issued the Google ID token.
 
+### FCM service account
+
+Ticket and area pushes use FCM HTTP v1 through the Firebase Admin SDK. Put the service-account JSON in user-secrets (one line). Leave it empty to skip sends without failing milestone or area-alert writes.
+
+```powershell
+dotnet user-secrets set "Firebase:ServiceAccountJson" "{...service-account json...}" --project api/MuniPulse.Api
+```
+
+Enable Cloud Messaging in the Firebase console for `munipulse-987ce`. Field workers trigger ward alerts with `POST /api/v1/alerts/area` (field-worker JWT or `X-Demo-Api-Key`). Marketing preference stays local and is never pushed.
+
 ### Firebase
 
 The Android package is `com.munipulse`. `android/app/google-services.json` is gitignored. Commit `android/app/google-services.json.example` only.
@@ -144,7 +154,7 @@ Requires the .NET 10 SDK.
 dotnet run --project api/MuniPulse.Api --launch-profile http
 ```
 
-`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, SAS request validation, the sync push contract, the 250 metre duplicate window, the field-worker demo key comparison, and unauthenticated calls. They do not need Firebase, MongoDB, Azure, or a JWT signing key. The API workflow runs the same command on every push.
+`dotnet test api/MuniPulse.slnx` runs the API tests. They cover create validation, SAS request validation, the sync push contract, the 250 metre duplicate window, push preference and copy rules, the field-worker demo key comparison, and unauthenticated calls (including area alerts). They do not need Firebase, MongoDB, Azure, or a JWT signing key. The API workflow runs the same command on every push.
 
 Health check: [http://localhost:5285/health](http://localhost:5285/health)
 
@@ -169,7 +179,10 @@ Routes live under `/api/v1`. Failures use the planning error envelope (`error.co
 | GET | `/api/v1/incidents/aggregates` | Bearer API JWT. Open reports in the ward, grouped when they share an `aggregateId`. |
 | GET | `/api/v1/incidents/nearby` | Bearer API JWT. Open reports in the same ward and category within 250 metres and 14 days. |
 | POST | `/api/v1/incidents/{id}/upvotes` | Bearer API JWT. One vote per user. |
-| POST | `/api/v1/incidents/{id}/milestones` | FieldWorker role, or header `X-Demo-Api-Key`. Appends Assigned, OnSite, Resolved, or Note and returns the timeline in time order. |
+| POST | `/api/v1/incidents/{id}/milestones` | FieldWorker role, or header `X-Demo-Api-Key`. Appends Assigned, OnSite, Resolved, or Note and returns the timeline in time order. After save, may send a ticket-status FCM push to the reporter when prefs allow. |
+| POST | `/api/v1/devices/fcm-token` | Bearer session. Stores the device FCM registration id. |
+| DELETE | `/api/v1/devices/fcm-token` | Bearer session. Clears that device token (also on sign-out). |
+| POST | `/api/v1/alerts/area` | FieldWorker role, or header `X-Demo-Api-Key`. Body `{ "wardCode", "note" }`. Pushes an area alert to users with that default ward and area emergencies on. |
 
 Demo wards seeded into MongoDB: `JHB-23`, `JHB-24`, `CPT-11`, `DBN-07`, `TSH-04`. Categories: `Pothole`, `WaterLeak`, `IllegalDumping`, `Streetlight`, `Sewage`, `Other`.
 

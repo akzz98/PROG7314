@@ -225,6 +225,34 @@ public sealed class IncidentStore
         }
     }
 
+    public async Task<IReadOnlyList<DevicePushToken>> ListDeviceTokensForUserAsync(
+        string userId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await DeviceTokens().Find(token => token.UserId == userId).ToListAsync(cancellationToken);
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
+    }
+
+    public async Task<IReadOnlyList<UserProfile>> ListUsersByDefaultWardAsync(
+        string wardCode,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await Users().Find(user => user.DefaultWardCode == wardCode).ToListAsync(cancellationToken);
+        }
+        catch (MongoException ex)
+        {
+            throw DatabaseFailure(ex);
+        }
+    }
+
     public async Task InsertMediaAsync(MediaAsset asset, CancellationToken cancellationToken)
     {
         try

@@ -3,6 +3,7 @@ using MuniPulse.Api.Auth;
 using MuniPulse.Api.Data;
 using MuniPulse.Api.Endpoints;
 using MuniPulse.Api.Errors;
+using MuniPulse.Api.Push;
 using Microsoft.AspNetCore.Http.Json;
 
 LogSafety.DisableTokenLogging();
@@ -16,6 +17,8 @@ builder.Services.Configure<JsonOptions>(options =>
 });
 builder.Services.AddSingleton<IncidentStore>();
 builder.Services.AddSingleton<BlobPhotos>();
+builder.Services.AddSingleton<FcmSender>();
+builder.Services.AddSingleton<PushDispatch>();
 builder.AddApiAuth();
 builder.Services.AddRateLimiter(options =>
 {

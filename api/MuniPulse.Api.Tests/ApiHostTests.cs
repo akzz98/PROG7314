@@ -64,6 +64,16 @@ public class ApiHostTests : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, register.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, clear.StatusCode);
     }
+
+    [Fact]
+    public async Task AreaAlertWithoutATokenIsUnauthorized()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/v1/alerts/area",
+            new { wardCode = "JHB-23", note = "Burst main" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
 }
 
 public class ApiFactory : WebApplicationFactory<Program>

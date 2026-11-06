@@ -12,7 +12,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
+import za.co.munipulse.PushLaunch
 import za.co.munipulse.auth.GoogleSignInViewModel
+import za.co.munipulse.auth.PushNotifications
 import za.co.munipulse.auth.SignInUiState
 import za.co.munipulse.ui.home.HomeScreen
 import za.co.munipulse.ui.home.HomeTab
@@ -30,7 +32,11 @@ import za.co.munipulse.ui.login.BiometricGateScreen
 import za.co.munipulse.ui.splash.SplashScreen
 
 @Composable
-fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
+fun MuniPulseApp(
+    pushLaunch: PushLaunch? = null,
+    onPushConsumed: () -> Unit = {},
+    viewModel: GoogleSignInViewModel = viewModel(),
+) {
     var splashHold by rememberSaveable { mutableStateOf(true) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showSync by rememberSaveable { mutableStateOf(false) }
@@ -95,6 +101,44 @@ fun MuniPulseApp(viewModel: GoogleSignInViewModel = viewModel()) {
             }
             Log.i(TAG, "Splash routed to $route")
         }
+    }
+
+    LaunchedEffect(pushLaunch, state, showSplash, biometricEnabled, biometricUnlocked) {
+        val launch = pushLaunch ?: return@LaunchedEffect
+        if (showSplash || state !is SignInUiState.SignedIn) {
+            return@LaunchedEffect
+        }
+        if (biometricEnabled && !biometricUnlocked) {
+            return@LaunchedEffect
+        }
+        showSettings = false
+        showSync = false
+        showLanguage = false
+        showNotifications = false
+        showProfile = false
+        showReport = false
+        showHotspots = false
+        when (launch.type) {
+            PushNotifications.TYPE_TICKET -> {
+                val id = launch.incidentId
+                if (!id.isNullOrBlank()) {
+                    homeTabName = HomeTab.Mine.name
+                    detailId = id
+                    Log.i(TAG, "Push opened incident")
+                }
+            }
+            PushNotifications.TYPE_AREA -> {
+                val ward = launch.wardCode
+                if (!ward.isNullOrBlank()) {
+                    viewModel.updateDefaultWard(ward)
+                    homeTabName = HomeTab.Pulse.name
+                    detailId = null
+                    viewModel.refreshWardPulse(ward)
+                    Log.i(TAG, "Push opened ward home")
+                }
+            }
+        }
+        onPushConsumed()
     }
 
     val current = state

@@ -6,6 +6,7 @@ using MuniPulse.Api.Auth;
 using MuniPulse.Api.Data;
 using MuniPulse.Api.Errors;
 using MuniPulse.Api.Models;
+using MuniPulse.Api.Push;
 
 namespace MuniPulse.Api.Endpoints;
 
@@ -28,6 +29,7 @@ public static class ApiEndpoints
         api.MapGet("/incidents", ListIncidents).RequireAuthorization();
         api.MapPost("/incidents/{id}/upvotes", Upvote).RequireAuthorization().RequireRateLimiting("writes");
         api.MapPost("/incidents/{id}/milestones", AddMilestone).RequireRateLimiting("writes");
+        api.MapPost("/alerts/area", SendAreaAlert).RequireRateLimiting("writes");
     }
 
     private static async Task<IResult> CreateSession(
@@ -963,6 +965,7 @@ public static class ApiEndpoints
         MilestoneRequest? request,
         HttpContext http,
         IncidentStore store,
+        PushDispatch pushes,
         IConfiguration configuration,
         ILogger<IncidentStore> logger,
         CancellationToken cancellationToken)
@@ -1052,9 +1055,77 @@ public static class ApiEndpoints
             id,
             ordered.Length);
 
+        if (updated is not null)
+        {
+            try
+            {
+                await pushes.NotifyTicketAsync(updated, actor.User!.Id, saved.Type, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("Ticket push failed after milestone ({ExceptionType}).", ex.GetType().Name);
+            }
+        }
+
         return Results.Created(
             $"/api/v1/incidents/{id}",
             new MilestoneCreatedResponse(updated?.Status ?? status, ordered));
+    }
+
+    private static async Task<IResult> SendAreaAlert(
+        AreaAlertRequest? request,
+        HttpContext http,
+        IncidentStore store,
+        PushDispatch pushes,
+        IConfiguration configuration,
+        ILogger<IncidentStore> logger,
+        CancellationToken cancellationToken)
+    {
+        var actor = await ResolveFieldWorkerAsync(http, store, configuration, logger, cancellationToken);
+        if (actor.Error is not null)
+        {
+            return actor.Error;
+        }
+
+        if (request is null)
+        {
+            return ApiErrors.Result(http, StatusCodes.Status400BadRequest, "VALIDATION_ERROR", "A JSON body is required.");
+        }
+
+        var wardCode = request.WardCode?.Trim() ?? "";
+        var note = request.Note?.Trim() ?? "";
+        var fields = new Dictionary<string, string>();
+        if (!WardCatalog.IsKnown(wardCode))
+        {
+            fields["wardCode"] = "Choose a demo ward such as JHB-23.";
+        }
+
+        if (note.Length > 500)
+        {
+            fields["note"] = "Use at most 500 characters.";
+        }
+
+        if (fields.Count > 0)
+        {
+            return ApiErrors.Result(
+                http,
+                StatusCodes.Status400BadRequest,
+                "VALIDATION_ERROR",
+                "One or more fields are invalid.",
+                fields);
+        }
+
+        try
+        {
+            await pushes.NotifyAreaAsync(wardCode, note, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Area push failed ({ExceptionType}).", ex.GetType().Name);
+        }
+
+        logger.LogInformation("Area alert accepted for ward {WardCode}", wardCode);
+        return Results.Accepted();
     }
 
     private static async Task<UserProfile?> RequireUserAsync(
@@ -1342,6 +1413,13 @@ public sealed class CreateIncidentRequest
 public sealed class MilestoneRequest
 {
     public string? Type { get; set; }
+
+    public string? Note { get; set; }
+}
+
+public sealed class AreaAlertRequest
+{
+    public string? WardCode { get; set; }
 
     public string? Note { get; set; }
 }

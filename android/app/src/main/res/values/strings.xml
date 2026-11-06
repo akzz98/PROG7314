@@ -172,6 +172,9 @@
     <string name="sync_error_waiting">Waiting to send</string>
     <string name="sync_error_resolved">This report is already resolved. The description on the server was kept.</string>
     <string name="sync_error_other">Could not send</string>
+    <string name="push_channel_name">MuniPulse alerts</string>
+    <string name="push_fallback_title">MuniPulse SA</string>
+    <string name="push_fallback_body">There is a new update.</string>
     <string name="settings_final_poe">Coming in Final POE</string>
     <string name="profile_title">Profile</string>
     <string name="profile_name">Name</string>
