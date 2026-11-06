@@ -18,6 +18,9 @@ interface PendingSyncDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(operation: PendingSyncOperation)
+
+    @Query("DELETE FROM pending_sync_operations WHERE id = :id")
+    suspend fun delete(id: String)
 }
 
 @Dao

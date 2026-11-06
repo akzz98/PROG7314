@@ -946,11 +946,13 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
                 }
                 if (updated.status == SyncStatus.ACK) {
                     ackCount += 1
+                    database.pendingSync().delete(row.id)
+                } else {
+                    if (updated.status == SyncStatus.CONFLICT) {
+                        conflictCount += 1
+                    }
+                    database.pendingSync().upsert(updated)
                 }
-                if (updated.status == SyncStatus.CONFLICT) {
-                    conflictCount += 1
-                }
-                database.pendingSync().upsert(updated)
             }
             settingsMirror.markSynced(System.currentTimeMillis())
             Log.i(TAG, "Sync push finished. Ack $ackCount. Conflict $conflictCount")
@@ -984,7 +986,9 @@ class GoogleSignInViewModel(application: Application) : AndroidViewModel(applica
         try {
             val database = MuniPulseDatabase.get(getApplication())
             val settings = database.localSettings().read()
-            val items = database.pendingSync().list().map { row ->
+            val items = database.pendingSync().list()
+                .filter { it.status != SyncStatus.ACK }
+                .map { row ->
                 QueuedReportRow(
                     id = row.id,
                     category = queuedCategory(row.payloadJson),
