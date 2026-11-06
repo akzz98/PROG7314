@@ -130,12 +130,14 @@ app.MapMuniPulseApi();
 
 var store = app.Services.GetRequiredService<IncidentStore>();
 var photos = app.Services.GetRequiredService<BlobPhotos>();
+var fcm = app.Services.GetRequiredService<FcmSender>();
 var bypass = app.Services.GetRequiredService<DevBypassIdTokenVerifier>();
 var jwt = app.Services.GetRequiredService<JwtSettings>();
 app.Logger.LogInformation(
-    "MuniPulse SA API starting. Mongo configured: {MongoConfigured}. Blob configured: {BlobConfigured}. Dev session bypass: {DevBypass}. JWT configured: {JwtConfigured}. Field worker key configured: {FieldWorkerKeyConfigured}",
+    "MuniPulse SA API starting. Mongo configured: {MongoConfigured}. Blob configured: {BlobConfigured}. FCM configured: {FcmConfigured}. Dev session bypass: {DevBypass}. JWT configured: {JwtConfigured}. Field worker key configured: {FieldWorkerKeyConfigured}",
     store.IsConfigured,
     photos.IsConfigured,
+    fcm.IsConfigured,
     bypass?.IsActive == true,
     jwt.IsConfigured,
     !string.IsNullOrWhiteSpace(app.Configuration["FieldWorker:DemoApiKey"]));

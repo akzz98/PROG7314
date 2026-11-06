@@ -35,6 +35,7 @@ captures/
 **/appsettings.Development.json
 **/appsettings.*.local.json
 **/secrets.json
+/secrets/
 
 # Environment files
 .env
@@ -45,3 +46,8 @@ captures/
 .DS_Store
 Thumbs.db
 desktop.ini
+android/gradlew
+android/gradlew.bat
+android/gradle/libs.versions.toml
+android/gradle/wrapper/gradle-wrapper.jar
+android/gradle/wrapper/gradle-wrapper.properties
